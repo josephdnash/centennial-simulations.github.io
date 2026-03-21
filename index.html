@@ -1,10 +1,170 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <title>Welcome to Centennial Simulations!</title>
-  </head>
-  <body>
-    <h1>Hello, world!</h1>
-    <p>My website is live.</p>
-  </body>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Xbox Touch Panel</title>
+    <style>
+        body {
+            background-color: #0f172a;
+            color: #e2e8f0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            box-sizing: border-box;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .status {
+            font-size: 14px;
+            font-weight: bold;
+            color: #f59e0b; /* Orange for connecting */
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .telemetry-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            width: 100%;
+            max-width: 600px;
+            margin-bottom: 40px;
+        }
+        .instrument {
+            background: #1e293b;
+            padding: 20px;
+            border-radius: 16px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            border: 1px solid #334155;
+        }
+        .instrument-label {
+            font-size: 14px;
+            color: #94a3b8;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+        }
+        .instrument-value {
+            font-size: 48px;
+            font-weight: 700;
+            color: #38bdf8; /* MSFS-style Blue */
+            font-variant-numeric: tabular-nums;
+        }
+        .instrument-unit {
+            font-size: 16px;
+            color: #64748b;
+        }
+        .controls {
+            width: 100%;
+            max-width: 600px;
+        }
+        .btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 20px;
+            font-size: 24px;
+            font-weight: bold;
+            border-radius: 12px;
+            width: 100%;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            transition: background 0.1s;
+        }
+        .btn:active {
+            background: #2563eb;
+            transform: translateY(2px);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>External Touch Panel</h1>
+        <div id="connection-status" class="status">Connecting to Cloud...</div>
+    </div>
+
+    <div class="telemetry-grid">
+        <div class="instrument">
+            <div class="instrument-label">Airspeed</div>
+            <div class="instrument-value" id="val-airspeed">---</div>
+            <div class="instrument-unit">KNOTS</div>
+        </div>
+        <div class="instrument">
+            <div class="instrument-label">Altitude</div>
+            <div class="instrument-value" id="val-altitude">---</div>
+            <div class="instrument-unit">FEET</div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button class="btn" id="btn-gear" onclick="toggleGear()">TOGGLE LANDING GEAR</button>
+    </div>
+
+    <script>
+        const statusDiv = document.getElementById('connection-status');
+        const altDiv = document.getElementById('val-altitude');
+        const spdDiv = document.getElementById('val-airspeed');
+        let ws;
+
+        // Current assumed gear state (0 = Up, 1 = Down). 
+        // In a full app, we would read the actual SimVar for gear position first!
+        let gearIsDown = true; 
+
+        function connect() {
+            // Connect to your Render server
+            ws = new WebSocket('wss://msfs-relay.onrender.com');
+
+            ws.onopen = () => {
+                statusDiv.innerText = 'Connected to MSFS';
+                statusDiv.style.color = '#10b981'; // Green
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    
+                    // Update UI if the data exists
+                    if (data.altitude !== undefined) {
+                        altDiv.innerText = Math.round(data.altitude);
+                    }
+                    if (data.airspeed !== undefined) {
+                        spdDiv.innerText = Math.round(data.airspeed);
+                    }
+                } catch (e) {
+                    console.log("Ignored non-JSON message");
+                }
+            };
+
+            ws.onclose = () => {
+                statusDiv.innerText = 'Disconnected - Retrying...';
+                statusDiv.style.color = '#ef4444'; // Red
+                setTimeout(connect, 3000);
+            };
+        }
+
+        function toggleGear() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                // Toggle our local state
+                gearIsDown = !gearIsDown;
+                
+                // Send the command back through the cloud to the Sim
+                const command = {
+                    type: "GEAR_SET",
+                    value: gearIsDown ? 1 : 0
+                };
+                ws.send(JSON.stringify(command));
+            }
+        }
+
+        // Start connection
+        connect();
+    </script>
+</body>
 </html>
