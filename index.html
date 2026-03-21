@@ -1,4 +1,4 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -52,4 +52,134 @@
         }
         .instrument-value {
             font-size: 48px;
-            font-
+            font-weight: 700;
+            color: #38bdf8; /* MSFS-style Blue */
+            font-variant-numeric: tabular-nums;
+        }
+        .instrument-unit {
+            font-size: 16px;
+            color: #64748b;
+        }
+        .controls {
+            width: 100%;
+            max-width: 600px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px; /* Adds space between the buttons */
+        }
+        .btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 20px;
+            font-size: 20px;
+            font-weight: bold;
+            border-radius: 12px;
+            width: 100%;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            transition: background 0.1s, transform 0.1s;
+        }
+        .btn:active {
+            transform: translateY(2px);
+        }
+        .btn-lights {
+            background: #eab308; /* Yellow for lights */
+            color: #1c1917;
+        }
+        .btn-lights:active {
+            background: #ca8a04;
+        }
+        .btn-gear:active {
+            background: #2563eb;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>External Touch Panel</h1>
+        <div id="connection-status" class="status">Connecting to Cloud...</div>
+    </div>
+
+    <div class="telemetry-grid">
+        <div class="instrument">
+            <div class="instrument-label">Airspeed</div>
+            <div class="instrument-value" id="val-airspeed">---</div>
+            <div class="instrument-unit">KNOTS</div>
+        </div>
+        <div class="instrument">
+            <div class="instrument-label">Altitude</div>
+            <div class="instrument-value" id="val-altitude">---</div>
+            <div class="instrument-unit">FEET</div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button class="btn btn-gear" id="btn-gear" onclick="toggleGear()">TOGGLE LANDING GEAR</button>
+        <button class="btn btn-lights" id="btn-lights" onclick="toggleLights()">TOGGLE NAV/STROBE LIGHTS</button>
+    </div>
+
+    <script>
+        const statusDiv = document.getElementById('connection-status');
+        const altDiv = document.getElementById('val-altitude');
+        const spdDiv = document.getElementById('val-airspeed');
+        let ws;
+
+        let gearIsDown = true; 
+
+        function connect() {
+            ws = new WebSocket('wss://msfs-relay.onrender.com');
+
+            ws.onopen = () => {
+                statusDiv.innerText = 'Connected to MSFS';
+                statusDiv.style.color = '#10b981'; // Green
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    
+                    if (data.altitude !== undefined) {
+                        altDiv.innerText = Math.round(data.altitude);
+                    }
+                    if (data.airspeed !== undefined) {
+                        spdDiv.innerText = Math.round(data.airspeed);
+                    }
+                } catch (e) {
+                    console.log("Ignored non-JSON message");
+                }
+            };
+
+            ws.onclose = () => {
+                statusDiv.innerText = 'Disconnected - Retrying...';
+                statusDiv.style.color = '#ef4444'; // Red
+                setTimeout(connect, 3000);
+            };
+        }
+
+        function toggleGear() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                gearIsDown = !gearIsDown;
+                const command = {
+                    type: "GEAR_SET",
+                    value: gearIsDown ? 1 : 0
+                };
+                ws.send(JSON.stringify(command));
+            }
+        }
+
+        function toggleLights() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                const command = { 
+                    type: "LIGHTS_TOGGLE" 
+                };
+                ws.send(JSON.stringify(command));
+            }
+        }
+
+        // Start connection
+        connect();
+    </script>
+</body>
+</html>
