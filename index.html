@@ -182,25 +182,45 @@
 
                 let actionUUID = actionData.UUID;
 
-                if (actionUUID === "com.elgato.streamdeck.profile.openchild") {
+                // 1. FOLDER NAVIGATION (Open Child or Switch Profile)
+                if (actionUUID === "com.elgato.streamdeck.profile.openchild" || actionUUID === "com.elgato.streamdeck.profile.switchprofile") {
                     if (!imgBase64) btn.innerHTML = `<span class="nav-icon">📁</span>` + btn.innerHTML;
-                    let childId = actionData.Settings ? actionData.Settings.ProfileUUID : null;
-                    if (childId && profilesDB[childId]) {
+                    
+                    let childId = actionData.Settings ? (actionData.Settings.ProfileUUID || actionData.Settings.profileid) : null;
+                    let targetKey = null;
+
+                    // FUZZY MATCHING: Aggressively hunt for the folder ID in our database
+                    if (childId) {
+                        let safeChildId = String(childId).toLowerCase();
+                        targetKey = Object.keys(profilesDB).find(k => k.toLowerCase().includes(safeChildId) || safeChildId.includes(k.toLowerCase()));
+                    }
+
+                    if (targetKey) {
                         btn.onclick = () => {
                             profileHistory.push(currentProfileUUID);
-                            renderVirtualDeck(childId);
+                            renderVirtualDeck(targetKey);
                         };
+                    } else {
+                        // Folder data is missing from the ZIP
+                        btn.style.opacity = "0.5";
+                        btn.style.border = "1px dashed red";
+                        btn.onclick = () => alert("Cannot open folder. Data not found in the uploaded profile.");
                     }
                 } 
+                // 2. BACK BUTTON
                 else if (actionUUID === "com.elgato.streamdeck.profile.backtoparent") {
                     if (!imgBase64) btn.innerHTML = `<span class="nav-icon">🔙</span>` + btn.innerHTML;
+                    
                     btn.onclick = () => {
                         if (profileHistory.length > 0) {
                             let parentId = profileHistory.pop();
                             renderVirtualDeck(parentId);
+                        } else {
+                            alert("You are already at the Root profile!");
                         }
                     };
                 } 
+                // 3. MSFS COMMAND
                 else {
                     let msfsCommand = actionData.Settings && actionData.Settings.ToggleValue ? actionData.Settings.ToggleValue : null;
                     if (msfsCommand) {
@@ -216,76 +236,65 @@
             }
         }
 
-        // --- THE DEEP UNZIPPER (BULLETPROOF EDITION) ---
+        // --- THE DEEP UNZIPPER (HEURISTIC EDITION) ---
         document.getElementById('profile-upload').addEventListener('change', async function(event) {
             const file = event.target.files[0];
             if (!file) return;
 
-            console.log(`>>> INITIALIZING UPLOAD: ${file.name}`);
             updateStatus('connecting', 'ANALYZING MULTI-PAGE ARCHIVE...');
             
             profilesDB = {};
             profileHistory = [];
             currentProfileUUID = null;
-            let rootProfileId = null;
-            let backupRootId = null;
-            let maxActions = -1;
+            let pageScores = {}; // Used to mathematically find the Home Screen
 
             try {
                 let zip = await JSZip.loadAsync(file);
 
-                // Handle nested zips
                 const nestedProfiles = zip.file(/\.streamDeckProfile$/i);
                 if (nestedProfiles.length > 0) {
-                    console.log(`>>> NESTED PROFILE DETECTED: ${nestedProfiles[0].name}`);
                     const innerArchive = await nestedProfiles[0].async("blob");
                     zip = await JSZip.loadAsync(innerArchive);
                 }
 
-                // Ignore hidden Mac folders
                 const manifestFiles = zip.file(/manifest\.json$/i).filter(f => !f.name.includes('__MACOSX'));
                 if (manifestFiles.length === 0) throw new Error("No manifest found.");
-
-                console.log(`>>> FOUND ${manifestFiles.length} CLEAN MANIFEST FILES`);
 
                 globalMaxCol = 4;
                 globalMaxRow = 2;
 
-                // Loop through EVERY manifest file we found and figure out what it is
                 for (let i = 0; i < manifestFiles.length; i++) {
                     let fileName = manifestFiles[i].name;
                     
                     try {
                         let content = await manifestFiles[i].async("string");
-                        
-                        // BULLETPROOF FIX 1: Strip invisible Byte Order Marks that crash JSON.parse
                         content = content.replace(/^\uFEFF/, ''); 
                         let data = JSON.parse(content);
                         
-                        // Check if this is the ROOT file
-                        if (data.Profiles && data.Profiles.length > 0) {
-                            let prefix = data.Profiles[0].Prefix || "";
-                            // BULLETPROOF FIX 2: Broadened Regex to catch weird folder names
-                            let match = prefix.match(/([^\/]+)\.sdProfile/i);
-                            if (match) rootProfileId = match[1];
-                            console.log(`>>> ROOT PROFILE DETECTED: ${rootProfileId}`);
-                        } 
-                        // Check if this is a PAGE file containing buttons
-                        else if (data.Actions) {
-                            // Extract the folder ID, falling back to a safe generic name if Regex fails
+                        if (data.Actions) {
                             let match = fileName.match(/([^\/]+)\.sdProfile\/manifest\.json$/i);
                             let pId = match ? match[1] : `page_fallback_${i}`;
 
                             profilesDB[pId] = data.Actions;
                             
-                            let actionCount = Object.keys(data.Actions).length;
-                            console.log(`>>> PARSED PAGE: ${pId} (${actionCount} buttons)`);
-
-                            if (actionCount > maxActions) {
-                                maxActions = actionCount;
-                                backupRootId = pId;
+                            // --- HEURISTIC SCORING ---
+                            // 1. More buttons = Higher Score
+                            let score = Object.keys(data.Actions).length;
+                            
+                            // 2. Look for a back button. Home screens rarely have back buttons!
+                            let hasBackButton = false;
+                            for (let k in data.Actions) {
+                                if (data.Actions[k].UUID === "com.elgato.streamdeck.profile.backtoparent") {
+                                    hasBackButton = true;
+                                    break;
+                                }
                             }
+                            
+                            // Heavy penalty for having a back button
+                            score += hasBackButton ? -500 : 500;
+                            pageScores[pId] = score;
 
+                            // Grid Math
                             for (let coordKey in data.Actions) {
                                 let parts = coordKey.split(',');
                                 let col = parseInt(parts[0]);
@@ -294,18 +303,21 @@
                                 if (row > globalMaxRow) globalMaxRow = row;
                             }
                         }
-                    } catch (err) {
-                        console.warn(`>>> CORRUPTED PAGE SKIPPED: ${fileName}`, err);
+                    } catch (err) {}
+                }
+
+                // Identify the Root Profile based on the highest Heuristic Score
+                let rootProfileId = null;
+                let highestScore = -9999;
+                
+                for (let pId in pageScores) {
+                    if (pageScores[pId] > highestScore) {
+                        highestScore = pageScores[pId];
+                        rootProfileId = pId;
                     }
                 }
 
-                // If we couldn't find the root file naturally, fall back to the biggest page
-                if (!rootProfileId || !profilesDB[rootProfileId]) {
-                    rootProfileId = backupRootId;
-                }
-
                 if (rootProfileId && profilesDB[rootProfileId]) {
-                    console.log(`>>> RENDERING HOME SCREEN: ${rootProfileId}`);
                     updateStatus('connected', `PROFILE LOADED!`);
                     renderVirtualDeck(rootProfileId);
                 } else {
