@@ -42,46 +42,21 @@
         .btn-upload { background: rgba(139, 92, 246, 0.1); color: var(--accent-purple); border: 1px dashed var(--accent-purple); padding: 16px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; width: 100%; cursor: pointer; border-radius: 12px; transition: background 0.2s; font-weight: bold;}
         .btn-upload:hover { background: rgba(139, 92, 246, 0.2); }
 
-        /* --- THE VIRTUAL ENGINE GRID --- */
+        /* THE VIRTUAL ENGINE GRID */
         #dynamic-deck {
-            display: grid;
-            gap: 12px;
-            flex-grow: 1;
-            width: 100%;
-            background: #000;
-            padding: 16px;
-            border-radius: 16px;
-            border: 2px solid var(--border-panel);
-            box-shadow: inset 0 4px 20px rgba(0,0,0,0.8);
+            display: grid; gap: 12px; flex-grow: 1; width: 100%; background: #000; padding: 16px; border-radius: 16px; border: 2px solid var(--border-panel); box-shadow: inset 0 4px 20px rgba(0,0,0,0.8);
         }
 
         .sd-btn {
-            background-color: #111;
-            border: 1px solid #333;
-            border-radius: 12px;
-            color: white;
-            font-size: 12px;
-            font-weight: bold;
-            display: flex;
-            align-items: flex-end; /* Puts text at bottom like Stream Deck */
-            justify-content: center;
-            padding-bottom: 8px;
-            cursor: pointer;
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-            transition: transform 0.05s, box-shadow 0.05s;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.5);
-            text-shadow: 1px 1px 3px rgba(0,0,0,0.9);
-            text-align: center;
-            min-height: 80px;
+            background-color: #111; border: 1px solid #333; border-radius: 12px; color: white; font-size: 12px; font-weight: bold;
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-end; padding-bottom: 8px;
+            cursor: pointer; background-size: cover; background-position: center; background-repeat: no-repeat;
+            transition: transform 0.05s, box-shadow 0.05s; box-shadow: 0 4px 8px rgba(0,0,0,0.5); text-shadow: 1px 1px 3px rgba(0,0,0,0.9);
+            text-align: center; min-height: 80px; position: relative;
         }
 
-        .sd-btn:active {
-            transform: scale(0.92);
-            box-shadow: 0 0 2px rgba(0,0,0,0.8);
-            border-color: var(--accent-blue);
-        }
+        .sd-btn:active { transform: scale(0.92); box-shadow: 0 0 2px rgba(0,0,0,0.8); border-color: var(--accent-blue); }
+        .nav-icon { font-size: 24px; margin-bottom: 4px; }
     </style>
 </head>
 <body>
@@ -127,6 +102,13 @@
         const spdDiv = document.getElementById('val-airspeed');
         let ws;
 
+        // --- GLOBAL ENGINE STATE ---
+        let profilesDB = {};         // Stores every page/folder in the profile
+        let profileHistory = [];     // Tracks our folder navigation history
+        let currentProfileUUID = null;
+        let globalMaxCol = 4;        // Defaults for standard 5x3 Grid
+        let globalMaxRow = 2;
+
         // --- NETWORK PIPELINE ---
         function updateStatus(state, customText = null) {
             statusDot.className = 'status-indicator'; 
@@ -159,147 +141,28 @@
             };
         }
 
-        // --- THE DYNAMIC RENDERER ---
-        function renderVirtualDeck(actionsObj) {
+        // --- THE DYNAMIC MULTI-PAGE RENDERER ---
+        function renderVirtualDeck(profileId) {
+            const actionsObj = profilesDB[profileId];
+            if (!actionsObj) return;
+
+            currentProfileUUID = profileId;
             const deckContainer = document.getElementById('dynamic-deck');
-            deckContainer.innerHTML = ''; // Clear default screen
+            deckContainer.innerHTML = ''; // Clear current screen
 
-            let maxCol = 0;
-            let maxRow = 0;
+            // Apply global grid size to prevent layout snapping when entering folders
+            deckContainer.style.gridTemplateColumns = `repeat(${globalMaxCol + 1}, 1fr)`;
+            deckContainer.style.gridTemplateRows = `repeat(${globalMaxRow + 1}, 1fr)`;
 
-            // Step 1: Calculate the grid size (Standard vs XL Stream Deck)
-            for (let coordKey in actionsObj) {
-                let parts = coordKey.split(',');
-                let col = parseInt(parts[0]);
-                let row = parseInt(parts[1]);
-                if (col > maxCol) maxCol = col;
-                if (row > maxRow) maxRow = row;
-            }
-
-            // Apply CSS Grid dimensions dynamically
-            deckContainer.style.gridTemplateColumns = `repeat(${maxCol + 1}, 1fr)`;
-            deckContainer.style.gridTemplateRows = `repeat(${maxRow + 1}, 1fr)`;
-
-            // Step 2: Draw the Buttons
             for (let coordKey in actionsObj) {
                 let actionData = actionsObj[coordKey];
                 let parts = coordKey.split(',');
                 let col = parseInt(parts[0]);
                 let row = parseInt(parts[1]);
 
-                // Create physical HTML button
                 let btn = document.createElement('button');
                 btn.className = 'sd-btn';
-                
-                // CSS Grid is 1-indexed, so we add 1 to the coordinates
                 btn.style.gridColumn = col + 1;
                 btn.style.gridRow = row + 1;
 
-                // Extract Base64 Image if it exists
-                let imgBase64 = null;
-                if (actionData.Settings && actionData.Settings.ImageOff_base64) {
-                    imgBase64 = actionData.Settings.ImageOff_base64;
-                } else if (actionData.Settings && actionData.Settings.ImageOn_base64) {
-                    imgBase64 = actionData.Settings.ImageOn_base64;
-                }
-                
-                if (imgBase64) {
-                    btn.style.backgroundImage = `url('data:image/png;base64,${imgBase64}')`;
-                }
-
-                // Extract Text Title
-                if (actionData.States && actionData.States.length > 0 && actionData.States[0].Title) {
-                    // Replace literal "\n" strings with actual HTML line breaks
-                    btn.innerHTML = actionData.States[0].Title.replace(/\\n/g, '<br>');
-                    
-                    // Apply font color if they set one
-                    if (actionData.States[0].TitleColor) {
-                        btn.style.color = actionData.States[0].TitleColor;
-                    }
-                }
-
-                // Extract the Command!
-                let msfsCommand = null;
-                if (actionData.Settings && actionData.Settings.ToggleValue) {
-                    msfsCommand = actionData.Settings.ToggleValue;
-                }
-
-                // Wire up the click event to fire through our cloud WebSocket
-                if (msfsCommand) {
-                    btn.onclick = () => {
-                        if (ws && ws.readyState === WebSocket.OPEN) {
-                            ws.send(JSON.stringify({ 
-                                type: "SD_COMMAND", 
-                                command: msfsCommand 
-                            }));
-                        }
-                    };
-                }
-
-                // Add button to the grid
-                deckContainer.appendChild(btn);
-            }
-        }
-
-        // --- THE UNZIPPER ---
-        document.getElementById('profile-upload').addEventListener('change', async function(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            updateStatus('connecting', 'ANALYZING ARCHIVE...');
-
-            try {
-                let zip = await JSZip.loadAsync(file);
-
-                const nestedProfiles = zip.file(/\.streamDeckProfile$/i);
-                if (nestedProfiles.length > 0) {
-                    const innerArchive = await nestedProfiles[0].async("blob");
-                    zip = await JSZip.loadAsync(innerArchive);
-                }
-
-                const manifestFiles = zip.file(/manifest\.json$/i);
-                if (manifestFiles.length === 0) throw new Error("No manifest found.");
-
-                // For this test, we will just grab the VERY FIRST manifest file we find
-                // (In a multi-page profile, we usually want the one with the most actions)
-                let bestManifestData = null;
-                let maxActions = -1;
-
-                for (let i = 0; i < manifestFiles.length; i++) {
-                    const content = await manifestFiles[i].async("string");
-                    const data = JSON.parse(content);
-                    
-                    // We are looking for the manifest that contains the "Actions" object
-                    if (data.Actions) {
-                        let actionCount = Object.keys(data.Actions).length;
-                        if (actionCount > maxActions) {
-                            maxActions = actionCount;
-                            bestManifestData = data;
-                        }
-                    }
-                }
-
-                if (bestManifestData && bestManifestData.Actions) {
-                    updateStatus('connected', `PROFILE LOADED!`);
-                    
-                    // SEND TO THE RENDERER!
-                    renderVirtualDeck(bestManifestData.Actions);
-                    
-                } else {
-                    updateStatus('disconnected', 'NO ACTIONS FOUND IN PROFILE');
-                }
-
-                setTimeout(() => updateStatus(ws && ws.readyState === 1 ? 'connected' : 'disconnected'), 3500);
-
-            } catch (error) {
-                console.error(">>> UNZIP ERROR: ", error);
-                updateStatus('disconnected', 'UPLOAD FAILED');
-            }
-            
-            event.target.value = ''; 
-        });
-
-        connect();
-    </script>
-</body>
-</html>
+                // 1. EXTRACT GRAPHICS
