@@ -40,8 +40,6 @@
         .instrument-unit { font-size: 14px; font-weight: 600; color: #52525b; }
 
         .upload-container { width: 100%; display: flex; justify-content: center; margin-bottom: 24px; }
-        
-        /* Updated: Native HTML Label for flawless mobile support */
         .btn-upload { background: rgba(139, 92, 246, 0.1); color: var(--accent-purple); border: 1px dashed var(--accent-purple); padding: 16px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; width: 100%; cursor: pointer; border-radius: 12px; transition: background 0.2s; font-weight: bold; text-align: center; box-sizing: border-box; display: block;}
         .btn-upload:hover { background: rgba(139, 92, 246, 0.2); }
 
@@ -218,7 +216,7 @@
             }
         }
 
-        // --- THE DEEP UNZIPPER ---
+        // --- THE DEEP UNZIPPER (BULLETPROOF EDITION) ---
         document.getElementById('profile-upload').addEventListener('change', async function(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -236,6 +234,7 @@
             try {
                 let zip = await JSZip.loadAsync(file);
 
+                // Handle nested zips
                 const nestedProfiles = zip.file(/\.streamDeckProfile$/i);
                 if (nestedProfiles.length > 0) {
                     console.log(`>>> NESTED PROFILE DETECTED: ${nestedProfiles[0].name}`);
@@ -243,68 +242,70 @@
                     zip = await JSZip.loadAsync(innerArchive);
                 }
 
-                // FIX: Actively ignore hidden Mac system folders that crash the JSON parser
+                // Ignore hidden Mac folders
                 const manifestFiles = zip.file(/manifest\.json$/i).filter(f => !f.name.includes('__MACOSX'));
                 if (manifestFiles.length === 0) throw new Error("No manifest found.");
 
                 console.log(`>>> FOUND ${manifestFiles.length} CLEAN MANIFEST FILES`);
 
-                const rootManifest = manifestFiles.find(f => f.name.toLowerCase() === 'manifest.json');
-                if (rootManifest) {
-                    try {
-                        let rootData = JSON.parse(await rootManifest.async("string"));
-                        if (rootData.Profiles && rootData.Profiles.length > 0) {
-                            let prefix = rootData.Profiles[0].Prefix || "";
-                            let match = prefix.match(/([a-zA-Z0-9\-]+)\.sdProfile/i);
-                            if (match) rootProfileId = match[1];
-                        }
-                    } catch(e) {
-                        console.warn(">>> COULD NOT PARSE ROOT MANIFEST: ", e);
-                    }
-                }
-
                 globalMaxCol = 4;
                 globalMaxRow = 2;
 
+                // Loop through EVERY manifest file we found and figure out what it is
                 for (let i = 0; i < manifestFiles.length; i++) {
                     let fileName = manifestFiles[i].name;
-                    if (fileName.toLowerCase() === 'manifest.json') continue; 
                     
-                    let match = fileName.match(/([a-zA-Z0-9\-]+)\.sdProfile\/manifest\.json$/i);
-                    if (match) {
-                        let pId = match[1];
-                        try {
-                            // Try/Catch around individual pages so one corrupted folder doesn't nuke the whole app
-                            let content = await manifestFiles[i].async("string");
-                            let data = JSON.parse(content);
-                            
-                            if (data.Actions) {
-                                profilesDB[pId] = data.Actions;
-                                
-                                let actionCount = Object.keys(data.Actions).length;
-                                if (actionCount > maxActions) {
-                                    maxActions = actionCount;
-                                    backupRootId = pId;
-                                }
+                    try {
+                        let content = await manifestFiles[i].async("string");
+                        
+                        // BULLETPROOF FIX 1: Strip invisible Byte Order Marks that crash JSON.parse
+                        content = content.replace(/^\uFEFF/, ''); 
+                        let data = JSON.parse(content);
+                        
+                        // Check if this is the ROOT file
+                        if (data.Profiles && data.Profiles.length > 0) {
+                            let prefix = data.Profiles[0].Prefix || "";
+                            // BULLETPROOF FIX 2: Broadened Regex to catch weird folder names
+                            let match = prefix.match(/([^\/]+)\.sdProfile/i);
+                            if (match) rootProfileId = match[1];
+                            console.log(`>>> ROOT PROFILE DETECTED: ${rootProfileId}`);
+                        } 
+                        // Check if this is a PAGE file containing buttons
+                        else if (data.Actions) {
+                            // Extract the folder ID, falling back to a safe generic name if Regex fails
+                            let match = fileName.match(/([^\/]+)\.sdProfile\/manifest\.json$/i);
+                            let pId = match ? match[1] : `page_fallback_${i}`;
 
-                                for (let coordKey in data.Actions) {
-                                    let parts = coordKey.split(',');
-                                    let col = parseInt(parts[0]);
-                                    let row = parseInt(parts[1]);
-                                    if (col > globalMaxCol) globalMaxCol = col;
-                                    if (row > globalMaxRow) globalMaxRow = row;
-                                }
+                            profilesDB[pId] = data.Actions;
+                            
+                            let actionCount = Object.keys(data.Actions).length;
+                            console.log(`>>> PARSED PAGE: ${pId} (${actionCount} buttons)`);
+
+                            if (actionCount > maxActions) {
+                                maxActions = actionCount;
+                                backupRootId = pId;
                             }
-                        } catch (err) {
-                            console.warn(`>>> CORRUPTED PAGE SKIPPED: ${fileName}`);
+
+                            for (let coordKey in data.Actions) {
+                                let parts = coordKey.split(',');
+                                let col = parseInt(parts[0]);
+                                let row = parseInt(parts[1]);
+                                if (col > globalMaxCol) globalMaxCol = col;
+                                if (row > globalMaxRow) globalMaxRow = row;
+                            }
                         }
+                    } catch (err) {
+                        console.warn(`>>> CORRUPTED PAGE SKIPPED: ${fileName}`, err);
                     }
                 }
 
-                if (!rootProfileId) rootProfileId = backupRootId;
+                // If we couldn't find the root file naturally, fall back to the biggest page
+                if (!rootProfileId || !profilesDB[rootProfileId]) {
+                    rootProfileId = backupRootId;
+                }
 
                 if (rootProfileId && profilesDB[rootProfileId]) {
-                    console.log(`>>> RENDERING ROOT FOLDER: ${rootProfileId}`);
+                    console.log(`>>> RENDERING HOME SCREEN: ${rootProfileId}`);
                     updateStatus('connected', `PROFILE LOADED!`);
                     renderVirtualDeck(rootProfileId);
                 } else {
