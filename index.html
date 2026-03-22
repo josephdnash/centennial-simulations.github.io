@@ -43,7 +43,6 @@
         .btn-upload { background: rgba(139, 92, 246, 0.1); color: var(--accent-purple); border: 1px dashed var(--accent-purple); padding: 16px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; width: 100%; cursor: pointer; border-radius: 12px; transition: background 0.2s; font-weight: bold; text-align: center; box-sizing: border-box; display: block;}
         .btn-upload:hover { background: rgba(139, 92, 246, 0.2); }
 
-        /* THE MANUAL OVERRIDE DROPDOWN */
         #deck-controls { display: none; width: 100%; margin-bottom: 16px; }
         .page-select {
             background: rgba(0,0,0,0.5); color: var(--accent-blue); border: 1px solid var(--border-panel);
@@ -52,7 +51,6 @@
         }
         .page-select:focus { border-color: var(--accent-blue); }
 
-        /* THE VIRTUAL ENGINE GRID */
         #dynamic-deck {
             display: grid; gap: 12px; flex-grow: 1; width: 100%; background: #000; padding: 16px; border-radius: 16px; border: 2px solid var(--border-panel); box-shadow: inset 0 4px 20px rgba(0,0,0,0.8);
         }
@@ -80,7 +78,7 @@
     </div>
 
     <div class="upload-container">
-        <input type="file" id="profile-upload" accept=".streamDeckProfile,.zip" style="display: none;">
+        <input type="file" id="profile-upload" accept=".streamDeckProfile,.zip" style="display: none;" onclick="this.value=null;">
         <label for="profile-upload" class="btn-upload">
             📥 Import Custom Profile
         </label>
@@ -116,14 +114,12 @@
         const spdDiv = document.getElementById('val-airspeed');
         let ws;
 
-        // --- GLOBAL ENGINE STATE ---
         let profilesDB = {};         
         let profileHistory = [];     
         let currentProfileUUID = null;
         let globalMaxCol = 4;        
         let globalMaxRow = 2;
 
-        // --- NETWORK PIPELINE ---
         function updateStatus(state, customText = null) {
             statusDot.className = 'status-indicator'; 
             if (state === 'connected') {
@@ -155,13 +151,11 @@
             };
         }
 
-        // --- MANUAL NAVIGATION HANDLER ---
         document.getElementById('page-selector').addEventListener('change', function(e) {
             profileHistory.push(currentProfileUUID);
             renderVirtualDeck(e.target.value);
         });
 
-        // --- THE DYNAMIC MULTI-PAGE RENDERER ---
         function renderVirtualDeck(profileId) {
             const actionsObj = profilesDB[profileId];
             if (!actionsObj) return;
@@ -170,7 +164,6 @@
             const deckContainer = document.getElementById('dynamic-deck');
             deckContainer.innerHTML = ''; 
 
-            // Sync the dropdown menu to match the current screen
             const sel = document.getElementById('page-selector');
             if (sel) sel.value = profileId;
 
@@ -179,37 +172,4 @@
 
             for (let coordKey in actionsObj) {
                 let actionData = actionsObj[coordKey];
-                let parts = coordKey.split(',');
-                let col = parseInt(parts[0]);
-                let row = parseInt(parts[1]);
-
-                let btn = document.createElement('button');
-                btn.className = 'sd-btn';
-                btn.style.gridColumn = col + 1;
-                btn.style.gridRow = row + 1;
-
-                let imgBase64 = null;
-                if (actionData.Settings && actionData.Settings.ImageOff_base64) imgBase64 = actionData.Settings.ImageOff_base64;
-                else if (actionData.Settings && actionData.Settings.ImageOn_base64) imgBase64 = actionData.Settings.ImageOn_base64;
-                
-                if (imgBase64) {
-                    btn.style.backgroundImage = `url('data:image/png;base64,${imgBase64}')`;
-                }
-
-                if (actionData.States && actionData.States.length > 0 && actionData.States[0].Title) {
-                    let titleSpan = document.createElement('span');
-                    titleSpan.innerHTML = actionData.States[0].Title.replace(/\\n/g, '<br>');
-                    if (actionData.States[0].TitleColor) titleSpan.style.color = actionData.States[0].TitleColor;
-                    btn.appendChild(titleSpan);
-                }
-
-                let actionUUID = actionData.UUID;
-
-                // 1. FOLDER NAVIGATION
-                if (actionUUID === "com.elgato.streamdeck.profile.openchild" || actionUUID === "com.elgato.streamdeck.profile.switchprofile") {
-                    if (!imgBase64) btn.innerHTML = `<span class="nav-icon">📁</span>` + btn.innerHTML;
-                    
-                    // Expanded search: Look in multiple places for the target folder ID
-                    let childId = null;
-                    if (actionData.Settings && actionData.Settings.ProfileUUID) childId = actionData.Settings.ProfileUUID;
-                    else if (actionData.Settings &&
+                let parts =
