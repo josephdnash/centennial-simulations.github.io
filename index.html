@@ -75,7 +75,7 @@
         body.fly-mode .grid-cell.type-gauge .cell-value { display: block; }
         body.fly-mode .grid-cell.type-gauge .cell-icon { display: none; }
 
-        /* --- NEW: ROTARY STYLES --- */
+        /* ROTARY STYLES */
         .rotary-container { 
             display: none; width: 100%; justify-content: space-between; align-items: center; 
             background: #000; border-radius: 8px; padding: 4px; box-sizing: border-box; margin-top: 4px;
@@ -143,7 +143,7 @@
     </div>
 
     <script>
-        // --- 1. OUR STANDARDIZED DICTIONARY (NOW WITH ROTARIES) ---
+        // --- 1. OUR STANDARDIZED DICTIONARY ---
         const DICTIONARY = {
             // Buttons
             "parking_brake": { name: "Parking Brake", icon: "🛑", type: "button", command: "PARKING_BRAKES" },
@@ -151,7 +151,11 @@
             "flaps_up": { name: "Flaps Up", icon: "🔼", type: "button", command: "FLAPS_DECR" },
             "flaps_down": { name: "Flaps Down", icon: "🔽", type: "button", command: "FLAPS_INCR" },
             "lights_nav": { name: "Nav Lights", icon: "💡", type: "button", command: "TOGGLE_NAV_LIGHTS" },
-            "ap_master": { name: "Autopilot", icon: "✈️", type: "button", command: "AUTOPILOT_ON" },
+            "ap_master": { name: "AP Master", icon: "✈️", type: "button", command: "AUTOPILOT_ON" },
+            
+            // --- NEW: AUTOPILOT MODE TOGGLES ---
+            "ap_hdg_hold": { name: "HDG Hold", icon: "🎯", type: "button", command: "AP_HDG_HOLD" },
+            "ap_alt_hold": { name: "ALT Hold", icon: "⏫", type: "button", command: "AP_ALT_HOLD" },
             
             // Gauges
             "gauge_rpm": { name: "Engine RPM", icon: "⏱️", type: "gauge", dataKey: "rpm", unit: "" },
@@ -160,7 +164,7 @@
             "gauge_alt": { name: "Altitude", icon: "⛰️", type: "gauge", dataKey: "altitude", unit: " FT" },
             "gauge_spd": { name: "Airspeed", icon: "💨", type: "gauge", dataKey: "airspeed", unit: " KTS" },
 
-            // NEW: Rotaries
+            // Rotaries
             "rotary_hdg": { name: "AP Heading", icon: "🧭", type: "rotary", dataKey: "ap_hdg", unit: "°", cmdDec: "HEADING_BUG_DEC", cmdInc: "HEADING_BUG_INC" },
             "rotary_alt": { name: "AP Altitude", icon: "↕️", type: "rotary", dataKey: "ap_alt", unit: " FT", cmdDec: "AP_ALT_VAR_DEC", cmdInc: "AP_ALT_VAR_INC" },
             "rotary_baro": { name: "Barometer", icon: "☁️", type: "rotary", dataKey: "baro", unit: " hPa", cmdDec: "KOHLSMAN_DEC", cmdInc: "KOHLSMAN_INC" }
@@ -185,14 +189,12 @@
                     
                     let valueId = (dictItem.type === 'gauge' || dictItem.type === 'rotary') ? `id="gauge-${index}"` : '';
 
-                    // Base HTML for the cell
                     let innerHTML = `
                         <div class="cell-icon">${dictItem.icon}</div>
                         <div class="cell-title">${dictItem.name}</div>
                         <div class="cell-value" ${valueId}>---${dictItem.unit || ''}</div>
                     `;
 
-                    // Inject Rotary Controls if applicable
                     if (dictItem.type === 'rotary') {
                         innerHTML += `
                             <div class="rotary-container">
@@ -206,12 +208,10 @@
                     innerHTML += `<div class="delete-btn" onclick="clearCell(event, ${index})">✕</div>`;
                     cell.innerHTML = innerHTML;
                     
-                    // Wire up Interactions
                     if (!isEditMode) {
                         if (dictItem.type === 'button') {
                             cell.onclick = () => sendCommand(dictItem.command);
                         } else if (dictItem.type === 'rotary') {
-                            // Stop propagation so clicking the buttons doesn't trigger anything else
                             cell.querySelector('.dec-btn').onclick = (e) => { e.stopPropagation(); sendCommand(dictItem.cmdDec); };
                             cell.querySelector('.inc-btn').onclick = (e) => { e.stopPropagation(); sendCommand(dictItem.cmdInc); };
                         }
@@ -253,7 +253,7 @@
                 const item = document.createElement('div');
                 item.className = 'component-item';
                 
-                let tagColor = 'var(--accent-green)'; // Button
+                let tagColor = 'var(--accent-green)'; 
                 if (data.type === 'gauge') tagColor = 'var(--accent-blue)';
                 if (data.type === 'rotary') tagColor = 'var(--accent-yellow)';
 
@@ -324,7 +324,6 @@
                                 if (dictItem && (dictItem.type === 'gauge' || dictItem.type === 'rotary')) {
                                     const simValue = data[dictItem.dataKey];
                                     if (simValue !== undefined) {
-                                        // Notice we use querySelectorAll because rotaries duplicate the cell-value class for styling
                                         const valueDivs = document.querySelectorAll(`#gauge-${index}`);
                                         valueDivs.forEach(div => {
                                             div.innerText = Math.round(simValue) + (dictItem.unit || '');
