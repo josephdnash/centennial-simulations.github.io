@@ -143,19 +143,20 @@
     </div>
 
     <script>
-        // --- 1. OUR STANDARDIZED DICTIONARY ---
+        // --- 1. OUR PURE RPN DICTIONARY ---
+        // By wrapping commands in "1 (>K:...)", we bypass the double-tap bug in MSFS
         const DICTIONARY = {
             // Buttons
-            "parking_brake": { name: "Parking Brake", icon: "🛑", type: "button", command: "PARKING_BRAKES" },
-            "gear_toggle": { name: "Landing Gear", icon: "⚙️", type: "button", command: "GEAR_TOGGLE" },
-            "flaps_up": { name: "Flaps Up", icon: "🔼", type: "button", command: "FLAPS_DECR" },
-            "flaps_down": { name: "Flaps Down", icon: "🔽", type: "button", command: "FLAPS_INCR" },
-            "lights_nav": { name: "Nav Lights", icon: "💡", type: "button", command: "TOGGLE_NAV_LIGHTS" },
-            "ap_master": { name: "AP Master", icon: "✈️", type: "button", command: "AUTOPILOT_ON" },
+            "parking_brake": { name: "Parking Brake", icon: "🛑", type: "button", command: "1 (>K:PARKING_BRAKES)" },
+            "gear_toggle": { name: "Landing Gear", icon: "⚙️", type: "button", command: "1 (>K:GEAR_TOGGLE)" },
+            "flaps_up": { name: "Flaps Up", icon: "🔼", type: "button", command: "1 (>K:FLAPS_DECR)" },
+            "flaps_down": { name: "Flaps Down", icon: "🔽", type: "button", command: "1 (>K:FLAPS_INCR)" },
+            "lights_nav": { name: "Nav Lights", icon: "💡", type: "button", command: "1 (>K:TOGGLE_NAV_LIGHTS)" },
+            "ap_master": { name: "AP Master", icon: "✈️", type: "button", command: "1 (>K:AP_MASTER)" },
             
-            // --- UPDATED: PANEL-SPECIFIC AUTOPILOT TOGGLES ---
-            "ap_hdg_hold": { name: "HDG Hold", icon: "🎯", type: "button", command: "AP_PANEL_HEADING_HOLD" },
-            "ap_alt_hold": { name: "ALT Hold", icon: "⏫", type: "button", command: "AP_PANEL_ALTITUDE_HOLD" },
+            // Fixed Autopilot Toggles
+            "ap_hdg_hold": { name: "HDG Hold", icon: "🎯", type: "button", command: "1 (>K:AP_HDG_HOLD)" },
+            "ap_alt_hold": { name: "ALT Hold", icon: "⏫", type: "button", command: "1 (>K:AP_ALT_HOLD)" },
             
             // Gauges
             "gauge_rpm": { name: "Engine RPM", icon: "⏱️", type: "gauge", dataKey: "rpm", unit: "" },
@@ -165,9 +166,9 @@
             "gauge_spd": { name: "Airspeed", icon: "💨", type: "gauge", dataKey: "airspeed", unit: " KTS" },
 
             // Rotaries
-            "rotary_hdg": { name: "AP Heading", icon: "🧭", type: "rotary", dataKey: "ap_hdg", unit: "°", cmdDec: "HEADING_BUG_DEC", cmdInc: "HEADING_BUG_INC" },
-            "rotary_alt": { name: "AP Altitude", icon: "↕️", type: "rotary", dataKey: "ap_alt", unit: " FT", cmdDec: "AP_ALT_VAR_DEC", cmdInc: "AP_ALT_VAR_INC" },
-            "rotary_baro": { name: "Barometer", icon: "☁️", type: "rotary", dataKey: "baro", unit: " hPa", cmdDec: "KOHLSMAN_DEC", cmdInc: "KOHLSMAN_INC" }
+            "rotary_hdg": { name: "AP Heading", icon: "🧭", type: "rotary", dataKey: "ap_hdg", unit: "°", cmdDec: "1 (>K:HEADING_BUG_DEC)", cmdInc: "1 (>K:HEADING_BUG_INC)" },
+            "rotary_alt": { name: "AP Altitude", icon: "↕️", type: "rotary", dataKey: "ap_alt", unit: " FT", cmdDec: "1 (>K:AP_ALT_VAR_DEC)", cmdInc: "1 (>K:AP_ALT_VAR_INC)" },
+            "rotary_baro": { name: "Barometer", icon: "☁️", type: "rotary", dataKey: "baro", unit: " hPa", cmdDec: "1 (>K:KOHLSMAN_DEC)", cmdInc: "1 (>K:KOHLSMAN_INC)" }
         };
 
         // --- 2. ENGINE STATE ---
