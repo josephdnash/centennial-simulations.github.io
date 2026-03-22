@@ -43,6 +43,15 @@
         .btn-upload { background: rgba(139, 92, 246, 0.1); color: var(--accent-purple); border: 1px dashed var(--accent-purple); padding: 16px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; width: 100%; cursor: pointer; border-radius: 12px; transition: background 0.2s; font-weight: bold; text-align: center; box-sizing: border-box; display: block;}
         .btn-upload:hover { background: rgba(139, 92, 246, 0.2); }
 
+        /* THE MANUAL OVERRIDE DROPDOWN */
+        #deck-controls { display: none; width: 100%; margin-bottom: 16px; }
+        .page-select {
+            background: rgba(0,0,0,0.5); color: var(--accent-blue); border: 1px solid var(--border-panel);
+            padding: 12px 16px; border-radius: 12px; font-size: 14px; font-family: 'Inter', sans-serif; font-weight: bold;
+            outline: none; cursor: pointer; width: 100%; text-align: center; appearance: auto;
+        }
+        .page-select:focus { border-color: var(--accent-blue); }
+
         /* THE VIRTUAL ENGINE GRID */
         #dynamic-deck {
             display: grid; gap: 12px; flex-grow: 1; width: 100%; background: #000; padding: 16px; border-radius: 16px; border: 2px solid var(--border-panel); box-shadow: inset 0 4px 20px rgba(0,0,0,0.8);
@@ -88,6 +97,10 @@
             <div class="instrument-value" id="val-altitude">---</div>
             <div class="instrument-unit">FEET</div>
         </div>
+    </div>
+
+    <div id="deck-controls">
+        <select id="page-selector" class="page-select"></select>
     </div>
 
     <div id="dynamic-deck">
@@ -142,6 +155,12 @@
             };
         }
 
+        // --- MANUAL NAVIGATION HANDLER ---
+        document.getElementById('page-selector').addEventListener('change', function(e) {
+            profileHistory.push(currentProfileUUID);
+            renderVirtualDeck(e.target.value);
+        });
+
         // --- THE DYNAMIC MULTI-PAGE RENDERER ---
         function renderVirtualDeck(profileId) {
             const actionsObj = profilesDB[profileId];
@@ -150,6 +169,10 @@
             currentProfileUUID = profileId;
             const deckContainer = document.getElementById('dynamic-deck');
             deckContainer.innerHTML = ''; 
+
+            // Sync the dropdown menu to match the current screen
+            const sel = document.getElementById('page-selector');
+            if (sel) sel.value = profileId;
 
             deckContainer.style.gridTemplateColumns = `repeat(${globalMaxCol + 1}, 1fr)`;
             deckContainer.style.gridTemplateRows = `repeat(${globalMaxRow + 1}, 1fr)`;
@@ -182,159 +205,11 @@
 
                 let actionUUID = actionData.UUID;
 
-                // 1. FOLDER NAVIGATION (Open Child or Switch Profile)
+                // 1. FOLDER NAVIGATION
                 if (actionUUID === "com.elgato.streamdeck.profile.openchild" || actionUUID === "com.elgato.streamdeck.profile.switchprofile") {
                     if (!imgBase64) btn.innerHTML = `<span class="nav-icon">📁</span>` + btn.innerHTML;
                     
-                    let childId = actionData.Settings ? (actionData.Settings.ProfileUUID || actionData.Settings.profileid) : null;
-                    let targetKey = null;
-
-                    // FUZZY MATCHING: Aggressively hunt for the folder ID in our database
-                    if (childId) {
-                        let safeChildId = String(childId).toLowerCase();
-                        targetKey = Object.keys(profilesDB).find(k => k.toLowerCase().includes(safeChildId) || safeChildId.includes(k.toLowerCase()));
-                    }
-
-                    if (targetKey) {
-                        btn.onclick = () => {
-                            profileHistory.push(currentProfileUUID);
-                            renderVirtualDeck(targetKey);
-                        };
-                    } else {
-                        // Folder data is missing from the ZIP
-                        btn.style.opacity = "0.5";
-                        btn.style.border = "1px dashed red";
-                        btn.onclick = () => alert("Cannot open folder. Data not found in the uploaded profile.");
-                    }
-                } 
-                // 2. BACK BUTTON
-                else if (actionUUID === "com.elgato.streamdeck.profile.backtoparent") {
-                    if (!imgBase64) btn.innerHTML = `<span class="nav-icon">🔙</span>` + btn.innerHTML;
-                    
-                    btn.onclick = () => {
-                        if (profileHistory.length > 0) {
-                            let parentId = profileHistory.pop();
-                            renderVirtualDeck(parentId);
-                        } else {
-                            alert("You are already at the Root profile!");
-                        }
-                    };
-                } 
-                // 3. MSFS COMMAND
-                else {
-                    let msfsCommand = actionData.Settings && actionData.Settings.ToggleValue ? actionData.Settings.ToggleValue : null;
-                    if (msfsCommand) {
-                        btn.onclick = () => {
-                            if (ws && ws.readyState === WebSocket.OPEN) {
-                                ws.send(JSON.stringify({ type: "SD_COMMAND", command: msfsCommand }));
-                            }
-                        };
-                    }
-                }
-
-                deckContainer.appendChild(btn);
-            }
-        }
-
-        // --- THE DEEP UNZIPPER (HEURISTIC EDITION) ---
-        document.getElementById('profile-upload').addEventListener('change', async function(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            updateStatus('connecting', 'ANALYZING MULTI-PAGE ARCHIVE...');
-            
-            profilesDB = {};
-            profileHistory = [];
-            currentProfileUUID = null;
-            let pageScores = {}; // Used to mathematically find the Home Screen
-
-            try {
-                let zip = await JSZip.loadAsync(file);
-
-                const nestedProfiles = zip.file(/\.streamDeckProfile$/i);
-                if (nestedProfiles.length > 0) {
-                    const innerArchive = await nestedProfiles[0].async("blob");
-                    zip = await JSZip.loadAsync(innerArchive);
-                }
-
-                const manifestFiles = zip.file(/manifest\.json$/i).filter(f => !f.name.includes('__MACOSX'));
-                if (manifestFiles.length === 0) throw new Error("No manifest found.");
-
-                globalMaxCol = 4;
-                globalMaxRow = 2;
-
-                for (let i = 0; i < manifestFiles.length; i++) {
-                    let fileName = manifestFiles[i].name;
-                    
-                    try {
-                        let content = await manifestFiles[i].async("string");
-                        content = content.replace(/^\uFEFF/, ''); 
-                        let data = JSON.parse(content);
-                        
-                        if (data.Actions) {
-                            let match = fileName.match(/([^\/]+)\.sdProfile\/manifest\.json$/i);
-                            let pId = match ? match[1] : `page_fallback_${i}`;
-
-                            profilesDB[pId] = data.Actions;
-                            
-                            // --- HEURISTIC SCORING ---
-                            // 1. More buttons = Higher Score
-                            let score = Object.keys(data.Actions).length;
-                            
-                            // 2. Look for a back button. Home screens rarely have back buttons!
-                            let hasBackButton = false;
-                            for (let k in data.Actions) {
-                                if (data.Actions[k].UUID === "com.elgato.streamdeck.profile.backtoparent") {
-                                    hasBackButton = true;
-                                    break;
-                                }
-                            }
-                            
-                            // Heavy penalty for having a back button
-                            score += hasBackButton ? -500 : 500;
-                            pageScores[pId] = score;
-
-                            // Grid Math
-                            for (let coordKey in data.Actions) {
-                                let parts = coordKey.split(',');
-                                let col = parseInt(parts[0]);
-                                let row = parseInt(parts[1]);
-                                if (col > globalMaxCol) globalMaxCol = col;
-                                if (row > globalMaxRow) globalMaxRow = row;
-                            }
-                        }
-                    } catch (err) {}
-                }
-
-                // Identify the Root Profile based on the highest Heuristic Score
-                let rootProfileId = null;
-                let highestScore = -9999;
-                
-                for (let pId in pageScores) {
-                    if (pageScores[pId] > highestScore) {
-                        highestScore = pageScores[pId];
-                        rootProfileId = pId;
-                    }
-                }
-
-                if (rootProfileId && profilesDB[rootProfileId]) {
-                    updateStatus('connected', `PROFILE LOADED!`);
-                    renderVirtualDeck(rootProfileId);
-                } else {
-                    throw new Error("No actions extracted from profile.");
-                }
-
-                setTimeout(() => updateStatus(ws && ws.readyState === 1 ? 'connected' : 'disconnected'), 3500);
-
-            } catch (error) {
-                console.error(">>> UNZIP ERROR: ", error);
-                updateStatus('disconnected', 'UPLOAD FAILED (CHECK CONSOLE)');
-            }
-            
-            event.target.value = ''; 
-        });
-
-        connect();
-    </script>
-</body>
-</html>
+                    // Expanded search: Look in multiple places for the target folder ID
+                    let childId = null;
+                    if (actionData.Settings && actionData.Settings.ProfileUUID) childId = actionData.Settings.ProfileUUID;
+                    else if (actionData.Settings &&
