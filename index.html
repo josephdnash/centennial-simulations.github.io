@@ -143,7 +143,7 @@
     </div>
 
     <script>
-        // --- 1. OUR CLEAN DICTIONARY ---
+        // --- 1. THE NATIVE MSFS DICTIONARY ---
         const DICTIONARY = {
             // Buttons
             "parking_brake": { name: "Parking Brake", icon: "🛑", type: "button", command: "PARKING_BRAKES" },
@@ -151,11 +151,12 @@
             "flaps_up": { name: "Flaps Up", icon: "🔼", type: "button", command: "FLAPS_DECR" },
             "flaps_down": { name: "Flaps Down", icon: "🔽", type: "button", command: "FLAPS_INCR" },
             "lights_nav": { name: "Nav Lights", icon: "💡", type: "button", command: "TOGGLE_NAV_LIGHTS" },
-            "ap_master": { name: "AP Master", icon: "✈️", type: "button", command: "AUTOPILOT_ON" },
             
-            // Modern Panel Autopilot Toggles
-            "ap_hdg_hold": { name: "HDG Hold", icon: "🎯", type: "button", command: "AP_PANEL_HEADING_HOLD" },
-            "ap_alt_hold": { name: "ALT Hold", icon: "⏫", type: "button", command: "AP_PANEL_ALTITUDE_HOLD" },
+            // Autopilot Modals
+            "ap_master": { name: "AP Master", icon: "✈️", type: "button", command: "AUTOPILOT_ON" },
+            "ap_hdg_hold": { name: "HDG Hold", icon: "🎯", type: "button", command: "AP_HDG_HOLD" },
+            "ap_alt_hold": { name: "ALT Hold", icon: "⏫", type: "button", command: "AP_ALT_HOLD" },
+            "ap_nav_hold": { name: "NAV Hold", icon: "🗺️", type: "button", command: "AP_NAV1_HOLD" },
             
             // Gauges
             "gauge_rpm": { name: "Engine RPM", icon: "⏱️", type: "gauge", dataKey: "rpm", unit: "" },
@@ -173,7 +174,7 @@
         // --- 2. ENGINE STATE ---
         let isEditMode = true;
         let selectedCellIndex = null;
-        let gridState = JSON.parse(localStorage.getItem('msfs_diy_panel_v3')) || new Array(15).fill(null);
+        let gridState = JSON.parse(localStorage.getItem('msfs_diy_panel_v4')) || new Array(15).fill(null);
 
         // --- 3. UI RENDERING ---
         function renderGrid() {
@@ -186,7 +187,6 @@
                 if (cellData) {
                     const dictItem = DICTIONARY[cellData.id];
                     if (!dictItem) {
-                        // Safe fallback if a dictionary item was removed
                         gridState[index] = null;
                         return renderGrid();
                     }
@@ -296,7 +296,7 @@
         }
 
         function saveLayout() {
-            localStorage.setItem('msfs_diy_panel_v3', JSON.stringify(gridState));
+            localStorage.setItem('msfs_diy_panel_v4', JSON.stringify(gridState));
         }
 
         // --- 5. NETWORK PIPELINE ---
