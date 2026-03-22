@@ -29,8 +29,7 @@
             font-weight: bold; border-radius: 12px; width: 100%; cursor: pointer; transition: transform 0.1s;
         }
         .btn:active { transform: translateY(2px); }
-        .btn-lights { background: #eab308; color: #1c1917; }
-        .btn-pause { background: #ef4444; color: white; border: 2px solid #b91c1c; }
+        .btn-brake { background: #ef4444; color: white; border: 2px solid #b91c1c; }
     </style>
 </head>
 <body>
@@ -54,9 +53,7 @@
     </div>
 
     <div class="controls">
-        <button class="btn btn-pause" onclick="sendCommand('PAUSE_SIM')">ACTIVE PAUSE SIMULATOR</button>
-        <button class="btn" onclick="toggleGear()">TOGGLE LANDING GEAR</button>
-        <button class="btn btn-lights" onclick="sendCommand('LIGHTS_TOGGLE')">TOGGLE NAV/STROBE LIGHTS</button>
+        <button class="btn btn-brake" onclick="sendCommand('PARKING_BRAKE')">TOGGLE PARKING BRAKE</button>
     </div>
 
     <script>
@@ -64,7 +61,6 @@
         const altDiv = document.getElementById('val-altitude');
         const spdDiv = document.getElementById('val-airspeed');
         let ws;
-        let gearIsDown = true; 
 
         function connect() {
             ws = new WebSocket('wss://msfs-relay.onrender.com');
@@ -92,13 +88,6 @@
         function sendCommand(typeCode) {
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({ type: typeCode }));
-            }
-        }
-
-        function toggleGear() {
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                gearIsDown = !gearIsDown;
-                ws.send(JSON.stringify({ type: "GEAR_SET", value: gearIsDown ? 1 : 0 }));
             }
         }
 
