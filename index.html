@@ -3,40 +3,197 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Xbox Touch Panel</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>MSFS Touch Deck</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Roboto+Mono:wght@500;700&display=swap" rel="stylesheet">
+    
     <style>
+        :root {
+            --bg-base: #09090b;       /* Deep obsidian */
+            --bg-panel: #18181b;      /* Dark gray for panels */
+            --border-panel: #27272a;  
+            --text-main: #f4f4f5;
+            --text-muted: #a1a1aa;
+            --accent-blue: #0ea5e9;   /* MSFS / Avionics Blue */
+            --accent-green: #10b981;  /* Status OK */
+            --accent-red: #ef4444;    /* Warnings / Brakes */
+            --accent-yellow: #f59e0b; /* Lights / Cautions */
+        }
+
         body {
-            background-color: #0f172a; color: #e2e8f0; margin: 0; padding: 20px;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            display: flex; flex-direction: column; align-items: center; height: 100vh; box-sizing: border-box;
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            box-sizing: border-box;
+            user-select: none; /* Prevents text selection when tapping rapidly */
+            -webkit-user-select: none;
         }
-        .header { text-align: center; margin-bottom: 30px; }
-        .status { font-size: 14px; font-weight: bold; color: #f59e0b; text-transform: uppercase; letter-spacing: 1px; }
+
+        /* --- Header & Status --- */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border-panel);
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            color: var(--text-muted);
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 8px 16px;
+            border-radius: 99px;
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border: 1px solid var(--border-panel);
+        }
+
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: var(--accent-yellow);
+            box-shadow: 0 0 10px var(--accent-yellow);
+            transition: all 0.3s ease;
+        }
+
+        .status-indicator.connected {
+            background-color: var(--accent-green);
+            box-shadow: 0 0 10px var(--accent-green);
+        }
+
+        .status-indicator.disconnected {
+            background-color: var(--accent-red);
+            box-shadow: 0 0 10px var(--accent-red);
+        }
+
+        /* --- Telemetry Grid --- */
         .telemetry-grid {
-            display: grid; grid-template-columns: 1fr 1fr; gap: 20px; width: 100%; max-width: 600px; margin-bottom: 40px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 40px;
         }
+
         .instrument {
-            background: #1e293b; padding: 20px; border-radius: 16px; text-align: center; border: 1px solid #334155;
+            background: var(--bg-panel);
+            border: 1px solid var(--border-panel);
+            border-radius: 20px;
+            padding: 32px 24px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.2);
         }
-        .instrument-label { font-size: 14px; color: #94a3b8; margin-bottom: 5px; text-transform: uppercase; }
-        .instrument-value { font-size: 48px; font-weight: 700; color: #38bdf8; font-variant-numeric: tabular-nums; }
-        .instrument-unit { font-size: 16px; color: #64748b; }
-        .controls { width: 100%; max-width: 600px; display: flex; flex-direction: column; gap: 15px; }
-        
-        /* Button Styles */
+
+        .instrument-label {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 8px;
+        }
+
+        .instrument-value {
+            font-family: 'Roboto Mono', monospace;
+            font-size: 64px;
+            font-weight: 700;
+            color: var(--accent-blue);
+            text-shadow: 0 0 20px rgba(14, 165, 233, 0.4);
+            line-height: 1;
+            margin-bottom: 8px;
+            font-variant-numeric: tabular-nums; /* Keeps numbers from jumping horizontally */
+        }
+
+        .instrument-unit {
+            font-size: 14px;
+            font-weight: 600;
+            color: #52525b;
+        }
+
+        /* --- Controls Grid --- */
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr; /* Two columns for buttons */
+            gap: 20px;
+            flex-grow: 1; /* Pushes to fill remaining space */
+        }
+
         .btn {
-            background: #3b82f6; color: white; border: none; padding: 20px; font-size: 20px;
-            font-weight: bold; border-radius: 12px; width: 100%; cursor: pointer; transition: transform 0.1s;
+            background: var(--bg-panel);
+            border: 1px solid var(--border-panel);
+            color: var(--text-main);
+            padding: 24px;
+            font-size: 18px;
+            font-weight: 600;
+            font-family: 'Inter', sans-serif;
+            border-radius: 16px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            transition: all 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
         }
-        .btn:active { transform: translateY(2px); }
-        .btn-brake { background: #ef4444; color: white; border: 2px solid #b91c1c; }
+
+        .btn:active {
+            transform: scale(0.96);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Specific Button Accents */
+        .btn-gear {
+            border-top: 4px solid var(--text-muted);
+        }
+        
+        .btn-lights {
+            border-top: 4px solid var(--accent-yellow);
+        }
+
+        .btn-brake {
+            border-top: 4px solid var(--accent-red);
+            grid-column: 1 / -1; /* Makes the brake button span full width */
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--accent-red);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-top: 4px solid var(--accent-red);
+        }
+
+        .btn-brake:active {
+            background: rgba(239, 68, 68, 0.2);
+        }
     </style>
 </head>
 <body>
 
     <div class="header">
-        <h1>External Touch Panel</h1>
-        <div id="connection-status" class="status">Connecting to Cloud...</div>
+        <h1>MSFS DECK</h1>
+        <div class="status-badge">
+            <div id="status-dot" class="status-indicator"></div>
+            <span id="connection-status-text">CONNECTING</span>
+        </div>
     </div>
 
     <div class="telemetry-grid">
@@ -53,34 +210,57 @@
     </div>
 
     <div class="controls">
-        <button class="btn btn-brake" onclick="sendCommand('PARKING_BRAKE')">TOGGLE PARKING BRAKE</button>
+        <button class="btn btn-gear" onclick="toggleGear()">
+            <span>LANDING GEAR</span>
+        </button>
+        <button class="btn btn-lights" onclick="sendCommand('LIGHTS_TOGGLE')">
+            <span>NAV/STROBE</span>
+        </button>
+        <button class="btn btn-brake" onclick="sendCommand('PARKING_BRAKE')">
+            <span>PARKING BRAKE</span>
+        </button>
     </div>
 
     <script>
-        const statusDiv = document.getElementById('connection-status');
+        const statusText = document.getElementById('connection-status-text');
+        const statusDot = document.getElementById('status-dot');
         const altDiv = document.getElementById('val-altitude');
         const spdDiv = document.getElementById('val-airspeed');
         let ws;
+        let gearIsDown = true; 
+
+        function updateStatus(state) {
+            statusDot.className = 'status-indicator'; // Reset classes
+            if (state === 'connected') {
+                statusText.innerText = 'DATA LINK ESTABLISHED';
+                statusDot.classList.add('connected');
+            } else if (state === 'disconnected') {
+                statusText.innerText = 'DATA LINK LOST';
+                statusDot.classList.add('disconnected');
+            } else {
+                statusText.innerText = 'CONNECTING...';
+            }
+        }
 
         function connect() {
+            updateStatus('connecting');
             ws = new WebSocket('wss://msfs-relay.onrender.com');
 
-            ws.onopen = () => {
-                statusDiv.innerText = 'Connected to MSFS';
-                statusDiv.style.color = '#10b981';
-            };
+            ws.onopen = () => updateStatus('connected');
 
             ws.onmessage = (event) => {
                 try {
                     const data = JSON.parse(event.data);
-                    if (data.altitude !== undefined) altDiv.innerText = Math.round(data.altitude);
-                    if (data.airspeed !== undefined) spdDiv.innerText = Math.round(data.airspeed);
+                    // Use padStart to keep the numbers aligned beautifully
+                    if (data.altitude !== undefined) altDiv.innerText = Math.round(data.altitude).toString().padStart(4, '0');
+                    if (data.airspeed !== undefined) spdDiv.innerText = Math.round(data.airspeed).toString().padStart(3, '0');
                 } catch (e) {}
             };
 
             ws.onclose = () => {
-                statusDiv.innerText = 'Disconnected - Retrying...';
-                statusDiv.style.color = '#ef4444';
+                updateStatus('disconnected');
+                altDiv.innerText = '---';
+                spdDiv.innerText = '---';
                 setTimeout(connect, 3000);
             };
         }
@@ -88,6 +268,13 @@
         function sendCommand(typeCode) {
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({ type: typeCode }));
+            }
+        }
+
+        function toggleGear() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                gearIsDown = !gearIsDown;
+                ws.send(JSON.stringify({ type: "GEAR_SET", value: gearIsDown ? 1 : 0 }));
             }
         }
 
