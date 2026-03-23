@@ -35,9 +35,11 @@
         
         .mode-toggle {
             background: #27272a; color: white; border: none; padding: 8px 16px; border-radius: 8px;
-            font-weight: bold; cursor: pointer; transition: background 0.2s;
+            font-weight: bold; cursor: pointer; transition: background 0.2s; display: flex; align-items: center; gap: 6px;
         }
         .mode-toggle.edit-active { background: var(--accent-blue); }
+        .mode-toggle.profile-btn { background: #18181b; border: 1px solid #333; }
+        .mode-toggle.profile-btn:hover { background: #27272a; }
 
         .status-indicator { width: 10px; height: 10px; border-radius: 50%; background-color: var(--accent-yellow); box-shadow: 0 0 10px var(--accent-yellow); display: inline-block; margin-right: 8px;}
         .status-indicator.connected { background-color: var(--accent-green); box-shadow: 0 0 10px var(--accent-green); }
@@ -117,8 +119,8 @@
         }
         body.edit-mode .grid-cell.filled .delete-btn { display: flex; }
 
-        /* --- THE DUAL PANE UI MODAL --- */
-        #component-modal {
+        /* --- MODALS --- */
+        .overlay {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.8); align-items: center; justify-content: center; z-index: 100;
         }
@@ -127,6 +129,7 @@
             border: 1px solid var(--border-panel); display: flex; flex-direction: row; overflow: hidden;
             box-shadow: 0 20px 50px rgba(0,0,0,0.5);
         }
+        .modal-content.small { width: 90%; max-width: 400px; height: auto; flex-direction: column; padding: 24px; box-sizing: border-box; }
         
         /* Left Column: Categories */
         .modal-sidebar {
@@ -165,6 +168,18 @@
         .component-item:hover { background: #3f3f46; border-color: #52525b; }
         .component-item:active { border-color: var(--accent-blue); transform: scale(0.98); }
         .component-tag { font-size: 10px; background: #000; padding: 4px 8px; border-radius: 6px; color: var(--text-muted); margin-left: auto; letter-spacing: 0.5px;}
+
+        /* Profile Modal Items */
+        .profile-item {
+            background: #27272a; padding: 16px; border-radius: 8px; margin-bottom: 8px; cursor: pointer;
+            font-weight: bold; color: white; border: 2px solid transparent; display: flex; justify-content: space-between;
+        }
+        .profile-item.active { border-color: var(--accent-blue); background: rgba(14, 165, 233, 0.1); color: var(--accent-blue); }
+        .profile-item:hover:not(.active) { background: #3f3f46; }
+        .create-profile-btn {
+            background: var(--accent-green); color: black; font-weight: bold; border: none; 
+            padding: 14px; border-radius: 8px; cursor: pointer; margin-top: 16px; font-size: 14px;
+        }
     </style>
 </head>
 <body class="edit-mode">
@@ -178,28 +193,34 @@
             </div>
         </div>
         <div class="controls-row">
+            <button class="mode-toggle profile-btn" onclick="openProfileModal()">🛩️ <span id="ui-current-profile">Default</span></button>
             <button id="btn-mode" class="mode-toggle edit-active" onclick="toggleMode()">✏️ EDIT MODE</button>
         </div>
     </div>
 
     <div id="builder-grid"></div>
 
-    <div id="component-modal">
+    <div id="profile-modal" class="overlay">
+        <div class="modal-content small">
+            <h2 style="margin-top: 0; color: white;">Layout Profiles</h2>
+            <p style="font-size: 12px; color: var(--text-muted); margin-top: 0;">Switching profiles here will sync across all your devices.</p>
+            <div id="profile-list" style="max-height: 300px; overflow-y: auto;"></div>
+            <button class="create-profile-btn" onclick="createNewProfile()">+ CREATE NEW LAYOUT</button>
+            <button class="cancel-btn" style="margin-top: 8px;" onclick="closeProfileModal()">Close</button>
+        </div>
+    </div>
+
+    <div id="component-modal" class="overlay">
         <div class="modal-content">
-            
             <div class="modal-sidebar">
                 <h2 style="margin-top: 0; margin-bottom: 20px; font-size: 18px; color: white;">Library</h2>
-                <div id="modal-categories" style="display: flex; flex-direction: column; overflow-y: auto; flex-grow: 1;">
-                    </div>
+                <div id="modal-categories" style="display: flex; flex-direction: column; overflow-y: auto; flex-grow: 1;"></div>
                 <button class="cancel-btn" onclick="closeModal()">Close</button>
             </div>
-
             <div class="modal-main">
                 <input type="text" id="modal-search" placeholder="Search for a button or gauge..." oninput="filterModal()">
-                <div class="component-list" id="component-list">
-                    </div>
+                <div class="component-list" id="component-list"></div>
             </div>
-
         </div>
     </div>
 
@@ -220,13 +241,16 @@
 
         firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
-        const layoutRef = database.ref('efb_layout_v2');
+
+        // Profile Management Refs
+        const globalActiveProfileRef = database.ref('efb_active_profile');
+        const profileListRef = database.ref('efb_profile_list');
+        const allLayoutsRef = database.ref('efb_layouts');
 
         // ==========================================
         // 2. THE MEGA DICTIONARY
         // ==========================================
         const DICTIONARY = {
-            // THE FIX: Reclassified App interface elements to "EFB Tools" to save "Navigation" for avionics.
             "nav_folder": { category: "EFB Tools", name: "Create Folder", icon: "📁", type: "nav" },
             "nav_back": { category: "EFB Tools", name: "Back to Home", icon: "⬅️", type: "nav", targetPage: 0 },
             
@@ -268,36 +292,117 @@
         };
 
         // ==========================================
-        // 3. TREE-BASED STATE MANAGEMENT
+        // 3. PROFILE & LAYOUT STATE MANAGEMENT
         // ==========================================
         let isEditMode = true;
         let selectedCellIndex = null;
         let draggedCellIndex = null; 
+        
+        let currentProfile = "";
+        let availableProfiles = [];
+        let layoutListener = null;
+
         let currentPage = 0;
         let currentFolderName = "";
-        
         let pagesData = new Array(10).fill(null).map(() => new Array(24).fill(""));
 
-        layoutRef.on('value', (snapshot) => {
-            const data = snapshot.val();
-            if (data && Array.isArray(data)) {
-                let safePages = new Array(10).fill(null).map(() => new Array(24).fill(""));
-                for (let p = 0; p < 10; p++) {
-                    if (data[p]) {
-                        Object.keys(data[p]).forEach(key => {
-                            let index = parseInt(key);
-                            if (!isNaN(index) && index >= 0 && index < 24) safePages[p][index] = data[p][key];
-                        });
-                    }
-                }
-                pagesData = safePages;
-            } else {
-                saveLayout();
+        // Listen for the global active profile to change (Syncs across devices)
+        globalActiveProfileRef.on('value', (snap) => {
+            let active = snap.val();
+            if (!active) {
+                active = "Default";
+                globalActiveProfileRef.set(active);
+                profileListRef.child("Default").set(true);
             }
-            renderGrid();
+            if (currentProfile !== active) {
+                loadProfile(active);
+            }
         });
 
-        function saveLayout() { layoutRef.set(pagesData); }
+        // Listen to the master list of all created profiles
+        profileListRef.on('value', (snap) => {
+            if (snap.val()) {
+                availableProfiles = Object.keys(snap.val());
+                renderProfileList();
+            }
+        });
+
+        function loadProfile(profileName) {
+            currentProfile = profileName;
+            document.getElementById('ui-current-profile').innerText = profileName.toUpperCase();
+            
+            // Detach listener from the old plane
+            if (layoutListener) allLayoutsRef.child(currentProfile).off('value', layoutListener);
+            
+            // Reset to Home screen
+            currentPage = 0;
+            currentFolderName = "";
+            document.getElementById('breadcrumb').innerText = "HOME";
+
+            // Attach listener to the new plane
+            layoutListener = allLayoutsRef.child(profileName).on('value', (snapshot) => {
+                const data = snapshot.val();
+                if (data && Array.isArray(data)) {
+                    let safePages = new Array(10).fill(null).map(() => new Array(24).fill(""));
+                    for (let p = 0; p < 10; p++) {
+                        if (data[p]) {
+                            Object.keys(data[p]).forEach(key => {
+                                let index = parseInt(key);
+                                if (!isNaN(index) && index >= 0 && index < 24) safePages[p][index] = data[p][key];
+                            });
+                        }
+                    }
+                    pagesData = safePages;
+                } else {
+                    // Initialize empty array for a brand new plane
+                    pagesData = new Array(10).fill(null).map(() => new Array(24).fill(""));
+                    saveLayout();
+                }
+                renderGrid();
+            });
+        }
+
+        function saveLayout() {
+            if (currentProfile) {
+                allLayoutsRef.child(currentProfile).set(pagesData);
+            }
+        }
+
+        // --- PROFILE UI LOGIC ---
+        function openProfileModal() {
+            renderProfileList();
+            document.getElementById('profile-modal').style.display = 'flex';
+        }
+        function closeProfileModal() {
+            document.getElementById('profile-modal').style.display = 'none';
+        }
+        
+        function renderProfileList() {
+            const list = document.getElementById('profile-list');
+            list.innerHTML = '';
+            
+            availableProfiles.forEach(prof => {
+                const item = document.createElement('div');
+                item.className = `profile-item ${prof === currentProfile ? 'active' : ''}`;
+                item.innerHTML = `<span>🛩️ ${prof}</span> ${prof === currentProfile ? '<span>(ACTIVE)</span>' : ''}`;
+                
+                item.onclick = () => {
+                    globalActiveProfileRef.set(prof); // Triggers the sync for all devices!
+                    closeProfileModal();
+                };
+                list.appendChild(item);
+            });
+        }
+
+        function createNewProfile() {
+            let newName = prompt("Enter a name for the new layout (e.g. Cessna 152):");
+            if (newName && newName.trim() !== "") {
+                let cleanName = newName.trim();
+                profileListRef.child(cleanName).set(true);
+                globalActiveProfileRef.set(cleanName);
+                closeProfileModal();
+            }
+        }
 
         function changePage(pageIndex, folderName = "") {
             currentPage = pageIndex;
@@ -417,7 +522,7 @@
         }
 
         // ==========================================
-        // DUAL PANE MODAL LOGIC
+        // DUAL PANE COMPONENT MODAL LOGIC
         // ==========================================
         let currentModalCategory = "All";
 
