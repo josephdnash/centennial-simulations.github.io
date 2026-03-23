@@ -183,7 +183,6 @@
 
         firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
-        // Clean slate for the new Auto-Routing structure
         const layoutRef = database.ref('efb_layout_v2');
 
 
@@ -406,42 +405,50 @@
             if (selectedCellIndex === null) return;
             
             const dictItem = DICTIONARY[componentId];
-            let label = null;
-            let targetPage = null;
+            
+            // Default to empty strings to keep Firebase happy!
+            let label = "";
+            let targetPage = "";
 
             if (componentId === "nav_folder") {
                 // 1. Ask for the Name
-                label = prompt("Enter Folder Name (e.g. LIGHTING):", "NEW FOLDER");
-                if (!label) return; // User hit cancel
+                let promptedLabel = prompt("Enter Folder Name (e.g. LIGHTING):", "NEW FOLDER");
+                if (!promptedLabel) return; // User hit cancel
+                label = promptedLabel;
 
                 // 2. Secretly find the next completely empty page (Pages 1 through 9)
-                targetPage = -1;
+                let foundPage = -1;
                 for (let i = 1; i < 10; i++) {
                     let isEmpty = pagesData[i].every(cell => cell === "" || cell === null);
                     if (isEmpty) {
-                        targetPage = i;
+                        foundPage = i;
                         break;
                     }
                 }
 
-                if (targetPage === -1) {
+                if (foundPage === -1) {
                     alert("Maximum folder limit (9 folders) reached!");
                     return;
                 }
-
-                // 3. Automatically drop a "Back to Home" button into slot 0 of the new folder
-                pagesData[targetPage][0] = { id: "nav_back", targetPage: 0 };
+                
+                targetPage = foundPage;
+                
+                // 3. Automatically drop a "Back to Home" button into slot 0 of the new folder safely
+                pagesData[targetPage][0] = { id: "nav_back", label: "Back", targetPage: 0 };
 
             } else if (componentId === "nav_back") {
                 // Manually placed back buttons always route to 0
                 targetPage = 0; 
+                label = "Back";
+            } else if (dictItem.targetPage !== undefined) {
+                targetPage = dictItem.targetPage;
             }
 
-            // Save the newly assigned button to the CURRENT page
+            // Save the newly assigned button to the CURRENT page (No undefined values!)
             pagesData[currentPage][selectedCellIndex] = { 
                 id: componentId, 
                 label: label, 
-                targetPage: targetPage || dictItem.targetPage 
+                targetPage: targetPage 
             };
             
             saveLayout(); 
@@ -521,6 +528,12 @@
                 updateStatus('disconnected');
                 setTimeout(connect, 3000);
             };
+        }
+
+        function sendCommand(cmd) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: "SD_COMMAND", command: cmd }));
+            }
         }
 
         connect();
