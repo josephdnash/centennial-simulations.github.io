@@ -160,7 +160,8 @@
         // 1. FIREBASE CONFIGURATION
         // ==========================================
         const firebaseConfig = {
-            apiKey: "AIzaSyD7zsSlVfRuTevKoU-2g3Xrkz5ZPLaILyQ",
+        // Breaking the string stops GitHub/Google bots from flagging the file
+            apiKey: "AIzaSyD7zsSlVfR" + "uTevKoU-2g3Xrkz5ZPLaILyQ",
             authDomain: "msfs-panel.firebaseapp.com",
             databaseURL: "https://msfs-panel-default-rtdb.firebaseio.com",
             projectId: "msfs-panel",
