@@ -60,6 +60,10 @@
         body.edit-mode .grid-cell:hover { border-color: var(--accent-blue); background-color: #1a1a2e; }
         body.edit-mode .grid-cell.filled { border: 2px solid var(--accent-blue); }
         
+        /* NEW: DRAG AND DROP VISUALS */
+        .grid-cell.dragging { opacity: 0.4; transform: scale(0.95); }
+        .grid-cell.drag-over { border: 2px dashed var(--accent-green) !important; background-color: rgba(16, 185, 129, 0.1) !important; }
+        
         /* Fly Mode Base Styles */
         body.fly-mode .grid-cell { border: 1px solid #333; box-shadow: 0 4px 8px rgba(0,0,0,0.5); transition: border-color 0.1s, background-color 0.1s;}
         body.fly-mode .grid-cell.empty { opacity: 0; pointer-events: none; }
@@ -185,34 +189,24 @@
         const database = firebase.database();
         const layoutRef = database.ref('efb_layout_v2');
 
-
         // ==========================================
         // 2. THE MEGA DICTIONARY
         // ==========================================
         const DICTIONARY = {
-            // --- NAVIGATION ---
             "nav_folder": { category: "Navigation", name: "Create Folder", icon: "📁", type: "nav" },
             "nav_back": { category: "Navigation", name: "Back to Home", icon: "⬅️", type: "nav", targetPage: 0 },
-
-            // --- FLIGHT CONTROLS ---
             "parking_brake": { category: "Controls", name: "Parking Brake", icon: "🛑", type: "button", command: "PARKING_BRAKES", stateKey: "parking_brake_state" },
             "gear_toggle": { category: "Controls", name: "Landing Gear", icon: "⚙️", type: "button", command: "GEAR_TOGGLE", stateKey: "gear_state" },
             "flaps_up": { category: "Controls", name: "Flaps Up", icon: "🔼", type: "button", command: "FLAPS_DECR" },
             "flaps_down": { category: "Controls", name: "Flaps Down", icon: "🔽", type: "button", command: "FLAPS_INCR" },
-            
-            // --- ELECTRICAL & SYSTEMS ---
             "batt_master": { category: "Systems", name: "Battery", icon: "🔋", type: "button", command: "TOGGLE_MASTER_BATTERY", stateKey: "batt_state" },
             "alt_master": { category: "Systems", name: "Alternator", icon: "⚡", type: "button", command: "TOGGLE_MASTER_ALTERNATOR", stateKey: "alt_state" },
             "pitot_heat": { category: "Systems", name: "Pitot Heat", icon: "🔥", type: "button", command: "PITOT_HEAT_TOGGLE", stateKey: "pitot_state" },
-
-            // --- LIGHTING ---
             "lights_nav": { category: "Lighting", name: "Nav Lights", icon: "🟢", type: "button", command: "TOGGLE_NAV_LIGHTS", stateKey: "nav_light_state" },
             "lights_beacon": { category: "Lighting", name: "Beacon", icon: "🚨", type: "button", command: "TOGGLE_BEACON_LIGHTS", stateKey: "beacon_state" },
             "lights_strobe": { category: "Lighting", name: "Strobe", icon: "✨", type: "button", command: "STROBES_TOGGLE", stateKey: "strobe_state" },
             "lights_taxi": { category: "Lighting", name: "Taxi Lights", icon: "🚕", type: "button", command: "TOGGLE_TAXI_LIGHTS", stateKey: "taxi_state" },
             "lights_landing": { category: "Lighting", name: "Landing", icon: "🔦", type: "button", command: "LANDING_LIGHTS_TOGGLE", stateKey: "landing_state" },
-            
-            // --- AUTOPILOT MODES ---
             "ap_master": { category: "Autopilot", name: "AP Master", icon: "✈️", type: "button", command: "AP_MASTER", stateKey: "ap_master_state" },
             "ap_fd": { category: "Autopilot", name: "Flight Dir", icon: "📐", type: "button", command: "TOGGLE_FLIGHT_DIRECTOR", stateKey: "fd_state" },
             "ap_hdg_hold": { category: "Autopilot", name: "HDG Hold", icon: "🎯", type: "button", command: "AP_PANEL_HEADING_HOLD", stateKey: "ap_hdg_state" },
@@ -220,8 +214,6 @@
             "ap_alt_hold": { category: "Autopilot", name: "ALT Hold", icon: "⏫", type: "button", command: "AP_PANEL_ALTITUDE_HOLD", stateKey: "ap_alt_state" },
             "ap_vs_hold": { category: "Autopilot", name: "VS Hold", icon: "📈", type: "button", command: "AP_PANEL_VS_HOLD", stateKey: "ap_vs_state" },
             "ap_apr_hold": { category: "Autopilot", name: "Approach", icon: "🛬", type: "button", command: "AP_APR_HOLD", stateKey: "ap_apr_state" },
-            
-            // --- GAUGES ---
             "gauge_rpm": { category: "Telemetry", name: "Engine RPM", icon: "⏱️", type: "gauge", dataKey: "rpm", unit: "" },
             "gauge_flaps": { category: "Telemetry", name: "Flaps %", icon: "📐", type: "gauge", dataKey: "flaps_pct", unit: "%" },
             "gauge_fuel": { category: "Telemetry", name: "Fuel Qty", icon: "⛽", type: "gauge", dataKey: "fuel_pct", unit: " Gal" },
@@ -229,8 +221,6 @@
             "gauge_spd": { category: "Telemetry", name: "Airspeed", icon: "💨", type: "gauge", dataKey: "airspeed", unit: " KTS" },
             "gauge_vs": { category: "Telemetry", name: "Vert Speed", icon: "↕️", type: "gauge", dataKey: "vs", unit: " FPM" },
             "gauge_oat": { category: "Telemetry", name: "Outside Temp", icon: "🌡️", type: "gauge", dataKey: "oat", unit: "°C" },
-
-            // --- ROTARIES ---
             "rotary_hdg": { category: "Rotaries", name: "AP Heading", icon: "🧭", type: "rotary", dataKey: "ap_hdg", unit: "°", cmdDec: "HEADING_BUG_DEC", cmdInc: "HEADING_BUG_INC" },
             "rotary_alt": { category: "Rotaries", name: "AP Altitude", icon: "↕️", type: "rotary", dataKey: "ap_alt", unit: " FT", cmdDec: "AP_ALT_VAR_DEC", cmdInc: "AP_ALT_VAR_INC" },
             "rotary_vs": { category: "Rotaries", name: "AP Vert Spd", icon: "📈", type: "rotary", dataKey: "ap_vs", unit: " FPM", cmdDec: "AP_VS_VAR_DEC", cmdInc: "AP_VS_VAR_INC" },
@@ -242,6 +232,7 @@
         // ==========================================
         let isEditMode = true;
         let selectedCellIndex = null;
+        let draggedCellIndex = null; // Track drag state
         let currentPage = 0;
         let currentFolderName = "";
         
@@ -266,24 +257,19 @@
             renderGrid();
         });
 
-        function saveLayout() {
-            layoutRef.set(pagesData);
-        }
+        function saveLayout() { layoutRef.set(pagesData); }
 
         function changePage(pageIndex, folderName = "") {
             currentPage = pageIndex;
             currentFolderName = folderName;
             
-            if (currentPage === 0) {
-                document.getElementById('breadcrumb').innerText = "HOME";
-            } else {
-                document.getElementById('breadcrumb').innerText = `HOME > ${currentFolderName}`;
-            }
+            if (currentPage === 0) document.getElementById('breadcrumb').innerText = "HOME";
+            else document.getElementById('breadcrumb').innerText = `HOME > ${currentFolderName}`;
             renderGrid();
         }
 
         // ==========================================
-        // 4. UI RENDERING & LOGIC
+        // 4. UI RENDERING & DRAG/DROP LOGIC
         // ==========================================
         function renderGrid() {
             const grid = document.getElementById('builder-grid');
@@ -300,7 +286,6 @@
 
                     cell.className = `grid-cell filled type-${dictItem.type}`;
                     let valueId = `id="data-${index}"`;
-                    
                     let displayName = cellData.label || dictItem.name;
 
                     let innerHTML = `
@@ -311,7 +296,6 @@
                     if (dictItem.type === 'gauge') {
                         innerHTML += `<div class="cell-value" ${valueId}>---${dictItem.unit || ''}</div>`;
                     }
-
                     if (dictItem.type === 'rotary') {
                         innerHTML += `
                             <div class="rotary-container">
@@ -326,17 +310,21 @@
                     cell.innerHTML = innerHTML;
                     
                     if (!isEditMode) {
-                        if (dictItem.type === 'button') {
-                            cell.onclick = () => sendCommand(dictItem.command);
-                        } else if (dictItem.type === 'nav') {
-                            cell.onclick = () => changePage(cellData.targetPage || 0, cellData.label || "");
-                        } else if (dictItem.type === 'rotary') {
+                        cell.removeAttribute('draggable');
+                        if (dictItem.type === 'button') cell.onclick = () => sendCommand(dictItem.command);
+                        else if (dictItem.type === 'nav') cell.onclick = () => changePage(cellData.targetPage || 0, cellData.label || "");
+                        else if (dictItem.type === 'rotary') {
                             cell.querySelector('.dec-btn').onclick = (e) => { e.stopPropagation(); sendCommand(dictItem.cmdDec); };
                             cell.querySelector('.inc-btn').onclick = (e) => { e.stopPropagation(); sendCommand(dictItem.cmdInc); };
                         }
                     } else {
-                        // NEW: Make filled cells clickable in Edit Mode to Rename or Swap
+                        // Edit Mode Logic: Click to edit, Drag to move
+                        cell.setAttribute('draggable', 'true');
                         cell.onclick = () => editCell(index);
+                        
+                        // Drag event listeners
+                        cell.ondragstart = (e) => handleDragStart(e, index);
+                        cell.ondragend = handleDragEnd;
                     }
                 } else {
                     cell.className = 'grid-cell empty';
@@ -345,8 +333,61 @@
                         cell.onclick = () => openModal(index);
                     }
                 }
+
+                // Both filled and empty cells need to be able to RECEIVE drops in edit mode
+                if (isEditMode) {
+                    cell.ondragover = handleDragOver;
+                    cell.ondragenter = handleDragEnter;
+                    cell.ondragleave = handleDragLeave;
+                    cell.ondrop = (e) => handleDrop(e, index);
+                }
+
                 grid.appendChild(cell);
             });
+        }
+
+        // --- DRAG AND DROP HANDLERS ---
+        function handleDragStart(e, index) {
+            draggedCellIndex = index;
+            e.target.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+        }
+
+        function handleDragEnd(e) {
+            e.target.classList.remove('dragging');
+            document.querySelectorAll('.grid-cell').forEach(c => c.classList.remove('drag-over'));
+            draggedCellIndex = null;
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault(); // Necessary to allow dropping
+            e.dataTransfer.dropEffect = 'move';
+            return false;
+        }
+
+        function handleDragEnter(e) {
+            e.preventDefault();
+            e.currentTarget.classList.add('drag-over');
+        }
+
+        function handleDragLeave(e) {
+            e.currentTarget.classList.remove('drag-over');
+        }
+
+        function handleDrop(e, targetIndex) {
+            e.stopPropagation();
+            e.currentTarget.classList.remove('drag-over');
+
+            // Don't swap if dropped on itself or if no valid drag started
+            if (draggedCellIndex === null || draggedCellIndex === targetIndex) return;
+
+            // Perform the Swap in the Array
+            const temp = pagesData[currentPage][targetIndex];
+            pagesData[currentPage][targetIndex] = pagesData[currentPage][draggedCellIndex];
+            pagesData[currentPage][draggedCellIndex] = temp;
+
+            saveLayout();
+            renderGrid();
         }
 
         function toggleMode() {
@@ -395,11 +436,8 @@
             document.getElementById('component-modal').style.display = 'flex';
         }
 
-        function closeModal() {
-            document.getElementById('component-modal').style.display = 'none';
-        }
+        function closeModal() { document.getElementById('component-modal').style.display = 'none'; }
 
-        // --- NEW: RENAME / EDIT EXISTING CELL LOGIC ---
         function editCell(index) {
             const cellData = pagesData[currentPage][index];
             if (!cellData) return;
@@ -407,14 +445,11 @@
             if (cellData.id === "nav_folder" || cellData.id === "nav_back") {
                 let currentName = cellData.label || DICTIONARY[cellData.id].name;
                 let newLabel = prompt("Rename this button:", currentName);
-                
                 if (newLabel !== null && newLabel.trim() !== "") {
                     pagesData[currentPage][index].label = newLabel.trim();
-                    saveLayout();
-                    renderGrid();
+                    saveLayout(); renderGrid();
                 }
             } else {
-                // If it's a regular button, just open the modal so you can swap it instantly!
                 openModal(index);
             }
         }
@@ -434,41 +469,25 @@
                 let foundPage = -1;
                 for (let i = 1; i < 10; i++) {
                     let isEmpty = pagesData[i].every(cell => cell === "" || cell === null);
-                    if (isEmpty) {
-                        foundPage = i;
-                        break;
-                    }
+                    if (isEmpty) { foundPage = i; break; }
                 }
 
-                if (foundPage === -1) {
-                    alert("Maximum folder limit (9 folders) reached!");
-                    return;
-                }
+                if (foundPage === -1) { alert("Maximum folder limit (9 folders) reached!"); return; }
                 
                 targetPage = foundPage;
                 pagesData[targetPage][0] = { id: "nav_back", label: "Back", targetPage: 0 };
-
             } else if (componentId === "nav_back") {
-                targetPage = 0; 
-                label = "Back";
+                targetPage = 0; label = "Back";
             } else if (dictItem.targetPage !== undefined) {
                 targetPage = dictItem.targetPage;
             }
 
-            pagesData[currentPage][selectedCellIndex] = { 
-                id: componentId, 
-                label: label, 
-                targetPage: targetPage 
-            };
-            
-            saveLayout(); 
-            closeModal();
-            renderGrid();
+            pagesData[currentPage][selectedCellIndex] = { id: componentId, label: label, targetPage: targetPage };
+            saveLayout(); closeModal(); renderGrid();
         }
 
         function clearCell(event, index) {
             event.stopPropagation(); 
-            
             const cellData = pagesData[currentPage][index];
             if (cellData && cellData.id) {
                 const dictItem = DICTIONARY[cellData.id];
@@ -478,10 +497,8 @@
                     pagesData[cellData.targetPage] = new Array(24).fill("");
                 }
             }
-
             pagesData[currentPage][index] = ""; 
-            saveLayout(); 
-            renderGrid();
+            saveLayout(); renderGrid();
         }
 
         // ==========================================
@@ -505,36 +522,27 @@
         function connect() {
             ws = new WebSocket('wss://msfs-relay.onrender.com');
             ws.onopen = () => updateStatus('connected');
-            
             ws.onmessage = (event) => {
                 try {
                     const data = JSON.parse(event.data);
-                    
                     if (!isEditMode) {
                         pagesData[currentPage].forEach((cellData, index) => {
                             if (cellData && cellData.id) {
                                 const dictItem = DICTIONARY[cellData.id];
-                                
                                 if (dictItem && (dictItem.type === 'gauge' || dictItem.type === 'rotary')) {
                                     const simValue = data[dictItem.dataKey];
                                     if (simValue !== undefined) {
                                         const valueDivs = document.querySelectorAll(`#data-${index}`);
-                                        valueDivs.forEach(div => {
-                                            div.innerText = Math.round(simValue) + (dictItem.unit || '');
-                                        });
+                                        valueDivs.forEach(div => div.innerText = Math.round(simValue) + (dictItem.unit || ''));
                                     }
                                 }
-                                
                                 if (dictItem && dictItem.type === 'button' && dictItem.stateKey) {
                                     const stateValue = data[dictItem.stateKey];
                                     if (stateValue !== undefined) {
                                         const cellEl = document.getElementById(`cell-${index}`);
                                         if (cellEl) {
-                                            if (stateValue === 1 || stateValue === true) {
-                                                cellEl.classList.add('active');
-                                            } else {
-                                                cellEl.classList.remove('active');
-                                            }
+                                            if (stateValue === 1 || stateValue === true) cellEl.classList.add('active');
+                                            else cellEl.classList.remove('active');
                                         }
                                     }
                                 }
@@ -543,11 +551,7 @@
                     }
                 } catch (e) {}
             };
-            
-            ws.onclose = () => {
-                updateStatus('disconnected');
-                setTimeout(connect, 3000);
-            };
+            ws.onclose = () => { updateStatus('disconnected'); setTimeout(connect, 3000); };
         }
 
         function sendCommand(cmd) {
@@ -555,7 +559,6 @@
                 ws.send(JSON.stringify({ type: "SD_COMMAND", command: cmd }));
             }
         }
-
         connect();
     </script>
 </body>
