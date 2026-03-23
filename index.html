@@ -10,6 +10,9 @@
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Roboto+Mono:wght@500;700&display=swap" rel="stylesheet">
 
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
+
     <style>
         :root {
             --bg-base: #09090b; --bg-panel: #18181b; --border-panel: #27272a;
@@ -131,7 +134,7 @@
 
     <div class="header">
         <div>
-            <h1>PANEL BUILDER</h1>
+            <h1>PANEL BUILDER <span style="font-size: 12px; color: var(--accent-blue);">CLOUD SYNC</span></h1>
             <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">
                 <div id="status-dot" class="status-indicator"></div>
                 <span id="connection-status-text">CONNECTING</span>
@@ -153,39 +156,75 @@
     </div>
 
     <script>
-        // --- 1. THE NATIVE DICTIONARY ---
+        // ==========================================
+        // 1. FIREBASE CONFIGURATION
+        // ==========================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyD7zsSlVfRuTevKoU-2g3Xrkz5ZPLaILyQ",
+            authDomain: "msfs-panel.firebaseapp.com",
+            databaseURL: "https://msfs-panel-default-rtdb.firebaseio.com",
+            projectId: "msfs-panel",
+            storageBucket: "msfs-panel.firebasestorage.app",
+            messagingSenderId: "622903655366",
+            appId: "1:622903655366:web:12ca8db100f1c104b790c7",
+            measurementId: "G-0VN39QBKR1"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+        const layoutRef = database.ref('efb_layout');
+
+
+        // ==========================================
+        // 2. OUR DICTIONARY
+        // ==========================================
         const DICTIONARY = {
-            // STANDARD BUTTONS
             "parking_brake": { name: "Parking Brake", icon: "🛑", type: "button", command: "PARKING_BRAKES", stateKey: "parking_brake_state" },
             "gear_toggle": { name: "Landing Gear", icon: "⚙️", type: "button", command: "GEAR_TOGGLE", stateKey: "gear_state" },
             "lights_nav": { name: "Nav Lights", icon: "💡", type: "button", command: "TOGGLE_NAV_LIGHTS", stateKey: "nav_light_state" },
             "flaps_up": { name: "Flaps Up", icon: "🔼", type: "button", command: "FLAPS_DECR" },
             "flaps_down": { name: "Flaps Down", icon: "🔽", type: "button", command: "FLAPS_INCR" },
-            
-            // AUTOPILOT TOGGLES
             "ap_master": { name: "AP Master", icon: "✈️", type: "button", command: "AP_MASTER", stateKey: "ap_master_state" },
             "ap_hdg_hold": { name: "HDG Hold", icon: "🎯", type: "button", command: "AP_PANEL_HEADING_HOLD", stateKey: "ap_hdg_state" },
             "ap_alt_hold": { name: "ALT Hold", icon: "⏫", type: "button", command: "AP_PANEL_ALTITUDE_HOLD", stateKey: "ap_alt_state" },
-            
-            // GAUGES
             "gauge_rpm": { name: "Engine RPM", icon: "⏱️", type: "gauge", dataKey: "rpm", unit: "" },
             "gauge_flaps": { name: "Flaps %", icon: "📐", type: "gauge", dataKey: "flaps_pct", unit: "%" },
             "gauge_fuel": { name: "Fuel Qty", icon: "⛽", type: "gauge", dataKey: "fuel_pct", unit: " Gal" },
             "gauge_alt": { name: "Altitude", icon: "⛰️", type: "gauge", dataKey: "altitude", unit: " FT" },
             "gauge_spd": { name: "Airspeed", icon: "💨", type: "gauge", dataKey: "airspeed", unit: " KTS" },
-
-            // ROTARIES
             "rotary_hdg": { name: "AP Heading", icon: "🧭", type: "rotary", dataKey: "ap_hdg", unit: "°", cmdDec: "HEADING_BUG_DEC", cmdInc: "HEADING_BUG_INC" },
             "rotary_alt": { name: "AP Altitude", icon: "↕️", type: "rotary", dataKey: "ap_alt", unit: " FT", cmdDec: "AP_ALT_VAR_DEC", cmdInc: "AP_ALT_VAR_INC" },
             "rotary_baro": { name: "Barometer", icon: "☁️", type: "rotary", dataKey: "baro", unit: " hPa", cmdDec: "KOHLSMAN_DEC", cmdInc: "KOHLSMAN_INC" }
         };
 
-        // --- 2. ENGINE STATE ---
+        // ==========================================
+        // 3. CLOUD STATE MANAGEMENT
+        // ==========================================
         let isEditMode = true;
         let selectedCellIndex = null;
-        let gridState = JSON.parse(localStorage.getItem('msfs_diy_panel_v7')) || new Array(24).fill(null);
+        let gridState = new Array(24).fill(null); // Default empty grid
 
-        // --- 3. UI RENDERING ---
+        // Listen for real-time changes from the Cloud!
+        layoutRef.on('value', (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                gridState = data;
+            } else {
+                // If the database is completely empty (first run), save an empty grid to it
+                saveLayout();
+            }
+            renderGrid();
+        });
+
+        function saveLayout() {
+            // Push changes to Firebase instead of local browser storage
+            layoutRef.set(gridState);
+        }
+
+        // ==========================================
+        // 4. UI RENDERING & LOGIC
+        // ==========================================
         function renderGrid() {
             const grid = document.getElementById('builder-grid');
             grid.innerHTML = '';
@@ -196,13 +235,9 @@
                 
                 if (cellData) {
                     const dictItem = DICTIONARY[cellData.id];
-                    if (!dictItem) {
-                        gridState[index] = null;
-                        return renderGrid();
-                    }
+                    if (!dictItem) return;
 
                     cell.className = `grid-cell filled type-${dictItem.type}`;
-                    
                     let valueId = (dictItem.type === 'gauge' || dictItem.type === 'rotary') ? `id="gauge-${index}"` : '';
 
                     let innerHTML = `
@@ -259,7 +294,6 @@
             renderGrid();
         }
 
-        // --- 4. THE MODAL BUILDER ---
         function openModal(index) {
             selectedCellIndex = index;
             const list = document.getElementById('component-list');
@@ -292,8 +326,7 @@
         function assignCell(componentId) {
             if (selectedCellIndex !== null) {
                 gridState[selectedCellIndex] = { id: componentId };
-                saveLayout();
-                renderGrid();
+                saveLayout(); // Pushes to cloud
                 closeModal();
             }
         }
@@ -301,15 +334,12 @@
         function clearCell(event, index) {
             event.stopPropagation(); 
             gridState[index] = null;
-            saveLayout();
-            renderGrid();
+            saveLayout(); // Pushes to cloud
         }
 
-        function saveLayout() {
-            localStorage.setItem('msfs_diy_panel_v7', JSON.stringify(gridState));
-        }
-
-        // --- 5. NETWORK PIPELINE & REACTIVE STATES ---
+        // ==========================================
+        // 5. MSFS RENDER PIPELINE
+        // ==========================================
         const statusText = document.getElementById('connection-status-text');
         const statusDot = document.getElementById('status-dot');
         let ws;
@@ -325,7 +355,6 @@
             }
         }
 
-        // *** THIS IS THE CRITICAL EXECUTION BLOCK THAT LIKELY GOT TRUNCATED ***
         function connect() {
             ws = new WebSocket('wss://msfs-relay.onrender.com');
             ws.onopen = () => updateStatus('connected');
@@ -381,7 +410,6 @@
         }
 
         connect();
-        renderGrid();
     </script>
 </body>
 </html>
