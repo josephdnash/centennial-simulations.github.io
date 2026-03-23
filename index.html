@@ -39,7 +39,7 @@
         .status-indicator.connected { background-color: var(--accent-green); box-shadow: 0 0 10px var(--accent-green); }
         .status-indicator.disconnected { background-color: var(--accent-red); box-shadow: 0 0 10px var(--accent-red); }
 
-        /* THE GRID: Upgraded to 6x4 to make elements smaller */
+        /* THE GRID */
         #builder-grid {
             display: grid; grid-template-columns: repeat(6, 1fr); grid-template-rows: repeat(4, 1fr);
             gap: 10px; flex-grow: 1; background: #000; padding: 16px; border-radius: 16px; 
@@ -78,7 +78,6 @@
             background-color: var(--bg-panel); border-top: 4px solid var(--accent-blue); justify-content: space-evenly;
         }
 
-        /* SHRUNK ICON & TEXT SIZES */
         .cell-icon { font-size: 24px; margin-bottom: 2px; transition: filter 0.2s;}
         .cell-title { font-size: 10px; font-weight: bold; text-align: center; padding: 0 4px; color: var(--text-muted); text-transform: uppercase;}
         
@@ -154,7 +153,7 @@
     </div>
 
     <script>
-        // --- 1. OUR DICTIONARY ---
+        // --- 1. THE CLEAN NATIVE DICTIONARY ---
         const DICTIONARY = {
             // STANDARD BUTTONS
             "parking_brake": { name: "Parking Brake", icon: "🛑", type: "button", command: "PARKING_BRAKES", stateKey: "parking_brake_state" },
@@ -162,12 +161,11 @@
             "lights_nav": { name: "Nav Lights", icon: "💡", type: "button", command: "TOGGLE_NAV_LIGHTS", stateKey: "nav_light_state" },
             "flaps_up": { name: "Flaps Up", icon: "🔼", type: "button", command: "FLAPS_DECR" },
             "flaps_down": { name: "Flaps Down", icon: "🔽", type: "button", command: "FLAPS_INCR" },
-            "ap_master": { name: "AP Master", icon: "✈️", type: "button", command: "AUTOPILOT_ON" },
             
-            // ADVANCED AVIONICS BUTTONS
-            "ap_hdg_hold": { name: "HDG Hold", icon: "🎯", type: "button", command: "1 (>K:AP_PANEL_HEADING_HOLD)" },
-            "ap_alt_hold": { name: "ALT Hold", icon: "⏫", type: "button", command: "1 (>K:AP_PANEL_ALTITUDE_HOLD)" },
-            "ap_nav_hold": { name: "NAV Hold", icon: "🗺️", type: "button", command: "1 (>K:AP_PANEL_NAV1_HOLD)" },
+            // AUTOPILOT TOGGLES (With State tracking)
+            "ap_master": { name: "AP Master", icon: "✈️", type: "button", command: "AP_MASTER", stateKey: "ap_master_state" },
+            "ap_hdg_hold": { name: "HDG Hold", icon: "🎯", type: "button", command: "AP_PANEL_HEADING_HOLD", stateKey: "ap_hdg_state" },
+            "ap_alt_hold": { name: "ALT Hold", icon: "⏫", type: "button", command: "AP_PANEL_ALTITUDE_HOLD", stateKey: "ap_alt_state" },
             
             // GAUGES
             "gauge_rpm": { name: "Engine RPM", icon: "⏱️", type: "gauge", dataKey: "rpm", unit: "" },
@@ -177,15 +175,15 @@
             "gauge_spd": { name: "Airspeed", icon: "💨", type: "gauge", dataKey: "airspeed", unit: " KTS" },
 
             // ROTARIES
-            "rotary_hdg": { name: "AP Heading", icon: "🧭", type: "rotary", dataKey: "ap_hdg", unit: "°", cmdDec: "1 (>K:HEADING_BUG_DEC)", cmdInc: "1 (>K:HEADING_BUG_INC)" },
-            "rotary_alt": { name: "AP Altitude", icon: "↕️", type: "rotary", dataKey: "ap_alt", unit: " FT", cmdDec: "1 (>K:AP_ALT_VAR_DEC)", cmdInc: "1 (>K:AP_ALT_VAR_INC)" },
-            "rotary_baro": { name: "Barometer", icon: "☁️", type: "rotary", dataKey: "baro", unit: " hPa", cmdDec: "1 (>K:KOHLSMAN_DEC)", cmdInc: "1 (>K:KOHLSMAN_INC)" }
+            "rotary_hdg": { name: "AP Heading", icon: "🧭", type: "rotary", dataKey: "ap_hdg", unit: "°", cmdDec: "HEADING_BUG_DEC", cmdInc: "HEADING_BUG_INC" },
+            "rotary_alt": { name: "AP Altitude", icon: "↕️", type: "rotary", dataKey: "ap_alt", unit: " FT", cmdDec: "AP_ALT_VAR_DEC", cmdInc: "AP_ALT_VAR_INC" },
+            "rotary_baro": { name: "Barometer", icon: "☁️", type: "rotary", dataKey: "baro", unit: " hPa", cmdDec: "KOHLSMAN_DEC", cmdInc: "KOHLSMAN_INC" }
         };
 
-        // --- 2. ENGINE STATE (Upgraded to 24 slots) ---
+        // --- 2. ENGINE STATE ---
         let isEditMode = true;
         let selectedCellIndex = null;
-        let gridState = JSON.parse(localStorage.getItem('msfs_diy_panel_v6')) || new Array(24).fill(null);
+        let gridState = JSON.parse(localStorage.getItem('msfs_diy_panel_v7')) || new Array(24).fill(null);
 
         // --- 3. UI RENDERING ---
         function renderGrid() {
@@ -229,160 +227,3 @@
                     if (!isEditMode) {
                         if (dictItem.type === 'button') {
                             cell.onclick = () => sendCommand(dictItem.command);
-                        } else if (dictItem.type === 'rotary') {
-                            cell.querySelector('.dec-btn').onclick = (e) => { e.stopPropagation(); sendCommand(dictItem.cmdDec); };
-                            cell.querySelector('.inc-btn').onclick = (e) => { e.stopPropagation(); sendCommand(dictItem.cmdInc); };
-                        }
-                    }
-                } else {
-                    cell.className = 'grid-cell empty';
-                    if (isEditMode) {
-                        cell.innerHTML = `<div style="color: #333; font-size: 24px;">+</div>`;
-                        cell.onclick = () => openModal(index);
-                    }
-                }
-                
-                grid.appendChild(cell);
-            });
-        }
-
-        function toggleMode() {
-            isEditMode = !isEditMode;
-            document.body.className = isEditMode ? 'edit-mode' : 'fly-mode';
-            
-            const btn = document.getElementById('btn-mode');
-            if (isEditMode) {
-                btn.innerHTML = "✏️ EDIT MODE";
-                btn.classList.add('edit-active');
-            } else {
-                btn.innerHTML = "🚀 FLY MODE";
-                btn.classList.remove('edit-active');
-            }
-            renderGrid();
-        }
-
-        // --- 4. THE MODAL BUILDER ---
-        function openModal(index) {
-            selectedCellIndex = index;
-            const list = document.getElementById('component-list');
-            list.innerHTML = '';
-
-            for (const [id, data] of Object.entries(DICTIONARY)) {
-                const item = document.createElement('div');
-                item.className = 'component-item';
-                
-                let tagColor = 'var(--accent-green)'; 
-                if (data.type === 'gauge') tagColor = 'var(--accent-blue)';
-                if (data.type === 'rotary') tagColor = 'var(--accent-yellow)';
-
-                item.innerHTML = `
-                    <span style="font-size: 20px;">${data.icon}</span> 
-                    <span>${data.name}</span>
-                    <span class="component-tag" style="color: ${tagColor}">${data.type.toUpperCase()}</span>
-                `;
-                item.onclick = () => assignCell(id);
-                list.appendChild(item);
-            }
-            document.getElementById('component-modal').style.display = 'flex';
-        }
-
-        function closeModal() {
-            document.getElementById('component-modal').style.display = 'none';
-            selectedCellIndex = null;
-        }
-
-        function assignCell(componentId) {
-            if (selectedCellIndex !== null) {
-                gridState[selectedCellIndex] = { id: componentId };
-                saveLayout();
-                renderGrid();
-                closeModal();
-            }
-        }
-
-        function clearCell(event, index) {
-            event.stopPropagation(); 
-            gridState[index] = null;
-            saveLayout();
-            renderGrid();
-        }
-
-        function saveLayout() {
-            localStorage.setItem('msfs_diy_panel_v6', JSON.stringify(gridState));
-        }
-
-        // --- 5. NETWORK PIPELINE & REACTIVE STATES ---
-        const statusText = document.getElementById('connection-status-text');
-        const statusDot = document.getElementById('status-dot');
-        let ws;
-
-        function updateStatus(state) {
-            statusDot.className = 'status-indicator'; 
-            if (state === 'connected') {
-                statusText.innerText = 'DATA LINK ESTABLISHED';
-                statusDot.classList.add('connected');
-            } else {
-                statusText.innerText = 'DATA LINK LOST';
-                statusDot.classList.add('disconnected');
-            }
-        }
-
-        function connect() {
-            ws = new WebSocket('wss://msfs-relay.onrender.com');
-            ws.onopen = () => updateStatus('connected');
-            
-            ws.onmessage = (event) => {
-                try {
-                    const data = JSON.parse(event.data);
-                    
-                    if (!isEditMode) {
-                        gridState.forEach((cellData, index) => {
-                            if (cellData) {
-                                const dictItem = DICTIONARY[cellData.id];
-                                
-                                if (dictItem && (dictItem.type === 'gauge' || dictItem.type === 'rotary')) {
-                                    const simValue = data[dictItem.dataKey];
-                                    if (simValue !== undefined) {
-                                        const valueDivs = document.querySelectorAll(`#gauge-${index}`);
-                                        valueDivs.forEach(div => {
-                                            div.innerText = Math.round(simValue) + (dictItem.unit || '');
-                                        });
-                                    }
-                                }
-                                
-                                if (dictItem && dictItem.type === 'button' && dictItem.stateKey) {
-                                    const stateValue = data[dictItem.stateKey];
-                                    if (stateValue !== undefined) {
-                                        const cellEl = document.getElementById(`cell-${index}`);
-                                        if (cellEl) {
-                                            if (stateValue === 1 || stateValue === true) {
-                                                cellEl.classList.add('active');
-                                            } else {
-                                                cellEl.classList.remove('active');
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        });
-                    }
-                } catch (e) {}
-            };
-            
-            ws.onclose = () => {
-                updateStatus('disconnected');
-                setTimeout(connect, 3000);
-            };
-        }
-
-        function sendCommand(cmd) {
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ type: "SD_COMMAND", command: cmd }));
-            }
-        }
-
-        connect();
-        renderGrid();
-    </script>
-</body>
-</html>
