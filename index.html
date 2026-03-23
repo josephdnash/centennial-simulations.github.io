@@ -334,6 +334,9 @@
                             cell.querySelector('.dec-btn').onclick = (e) => { e.stopPropagation(); sendCommand(dictItem.cmdDec); };
                             cell.querySelector('.inc-btn').onclick = (e) => { e.stopPropagation(); sendCommand(dictItem.cmdInc); };
                         }
+                    } else {
+                        // NEW: Make filled cells clickable in Edit Mode to Rename or Swap
+                        cell.onclick = () => editCell(index);
                     }
                 } else {
                     cell.className = 'grid-cell empty';
@@ -396,6 +399,26 @@
             document.getElementById('component-modal').style.display = 'none';
         }
 
+        // --- NEW: RENAME / EDIT EXISTING CELL LOGIC ---
+        function editCell(index) {
+            const cellData = pagesData[currentPage][index];
+            if (!cellData) return;
+
+            if (cellData.id === "nav_folder" || cellData.id === "nav_back") {
+                let currentName = cellData.label || DICTIONARY[cellData.id].name;
+                let newLabel = prompt("Rename this button:", currentName);
+                
+                if (newLabel !== null && newLabel.trim() !== "") {
+                    pagesData[currentPage][index].label = newLabel.trim();
+                    saveLayout();
+                    renderGrid();
+                }
+            } else {
+                // If it's a regular button, just open the modal so you can swap it instantly!
+                openModal(index);
+            }
+        }
+
         function assignCell(componentId) {
             if (selectedCellIndex === null) return;
             
@@ -443,26 +466,19 @@
             renderGrid();
         }
 
-        // --- NEW: CASCADING DELETE LOGIC ---
         function clearCell(event, index) {
             event.stopPropagation(); 
             
             const cellData = pagesData[currentPage][index];
             if (cellData && cellData.id) {
                 const dictItem = DICTIONARY[cellData.id];
-                
-                // If they are trying to delete a Folder (and it's not the Back button)
                 if (dictItem && cellData.id === "nav_folder" && cellData.targetPage) {
                     const confirmDelete = confirm(`Are you sure you want to delete the folder "${cellData.label}" and permanently erase all of the buttons inside it?`);
-                    
-                    if (!confirmDelete) return; // User chickened out!
-                    
-                    // Wipe the target sub-page clean in the database so it can be recycled later
+                    if (!confirmDelete) return; 
                     pagesData[cellData.targetPage] = new Array(24).fill("");
                 }
             }
 
-            // Erase the button from the current page
             pagesData[currentPage][index] = ""; 
             saveLayout(); 
             renderGrid();
