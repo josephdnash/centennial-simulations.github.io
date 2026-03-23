@@ -19,6 +19,7 @@
             --text-main: #f4f4f5; --text-muted: #a1a1aa;
             --accent-blue: #0ea5e9; --accent-green: #10b981;
             --accent-red: #ef4444; --accent-yellow: #f59e0b;
+            --accent-purple: #a855f7;
         }
 
         body {
@@ -64,7 +65,7 @@
         body.fly-mode .grid-cell.empty { opacity: 0; pointer-events: none; }
         
         /* BUTTON Fly Mode */
-        body.fly-mode .grid-cell.type-button:active { transform: scale(0.92); box-shadow: 0 0 2px rgba(0,0,0,0.8); border-color: var(--accent-blue); }
+        body.fly-mode .grid-cell.type-button:active, body.fly-mode .grid-cell.type-nav:active { transform: scale(0.92); box-shadow: 0 0 2px rgba(0,0,0,0.8); border-color: var(--accent-blue); }
         
         /* ACTIVE BUTTON STATE */
         body.fly-mode .grid-cell.type-button.active {
@@ -72,9 +73,9 @@
             background-color: rgba(16, 185, 129, 0.1);
             box-shadow: 0 0 15px rgba(16, 185, 129, 0.3);
         }
-        body.fly-mode .grid-cell.type-button.active .cell-icon {
-            filter: drop-shadow(0px 0px 8px rgba(255, 255, 255, 0.8));
-        }
+
+        /* NAV BUTTONS */
+        body.fly-mode .grid-cell.type-nav { border-color: var(--accent-purple); background: linear-gradient(180deg, #18181b 0%, #111 100%); }
         
         /* GAUGE & ROTARY Fly Mode */
         body.fly-mode .grid-cell.type-gauge { background-color: var(--bg-panel); border-top: 4px solid var(--accent-blue); justify-content: space-evenly; }
@@ -109,21 +110,6 @@
         }
         body.edit-mode .grid-cell.filled .delete-btn { display: flex; }
 
-        /* PAGINATION UI */
-        .pagination-container {
-            display: flex; justify-content: center; gap: 16px; margin-top: 20px;
-        }
-        .page-btn {
-            background: #27272a; color: var(--text-muted); border: 2px solid transparent; 
-            padding: 12px 32px; border-radius: 12px; font-size: 16px; font-weight: 800; 
-            cursor: pointer; transition: all 0.2s;
-        }
-        .page-btn:active { transform: scale(0.95); }
-        .page-btn.active {
-            background: var(--bg-panel); color: var(--accent-blue); border-color: var(--accent-blue);
-            box-shadow: 0 4px 15px rgba(14, 165, 233, 0.2);
-        }
-
         /* THE COMPONENT MODAL */
         #component-modal {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -156,7 +142,7 @@
 
     <div class="header">
         <div>
-            <h1>PANEL BUILDER <span style="font-size: 12px; color: var(--accent-blue);">CLOUD SYNC</span></h1>
+            <h1 id="page-display">HOME PAGE</h1>
             <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">
                 <div id="status-dot" class="status-indicator"></div>
                 <span id="connection-status-text">CONNECTING</span>
@@ -168,12 +154,6 @@
     </div>
 
     <div id="builder-grid"></div>
-
-    <div class="pagination-container">
-        <button class="page-btn active" onclick="changePage(0)">PAGE 1</button>
-        <button class="page-btn" onclick="changePage(1)">PAGE 2</button>
-        <button class="page-btn" onclick="changePage(2)">PAGE 3</button>
-    </div>
 
     <div id="component-modal">
         <div class="modal-content">
@@ -200,15 +180,18 @@
 
         firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
-        
-        // Changing the DB reference to force a clean slate for the new 3D array data structure
-        const layoutRef = database.ref('efb_layout_multipage');
+        const layoutRef = database.ref('efb_layout_folders');
 
 
         // ==========================================
-        // 2. THE MEGA DICTIONARY 
+        // 2. THE MEGA DICTIONARY
         // ==========================================
         const DICTIONARY = {
+            // --- NAVIGATION ---
+            "nav_folder": { category: "Navigation", name: "Custom Folder", icon: "📁", type: "nav" },
+            "nav_back": { category: "Navigation", name: "Back to Home", icon: "⬅️", type: "nav", targetPage: 0 },
+
+            // --- FLIGHT CONTROLS ---
             "parking_brake": { category: "Controls", name: "Parking Brake", icon: "🛑", type: "button", command: "PARKING_BRAKES", stateKey: "parking_brake_state" },
             "gear_toggle": { category: "Controls", name: "Landing Gear", icon: "⚙️", type: "button", command: "GEAR_TOGGLE", stateKey: "gear_state" },
             "flaps_up": { category: "Controls", name: "Flaps Up", icon: "🔼", type: "button", command: "FLAPS_DECR" },
@@ -225,55 +208,36 @@
             "lights_landing": { category: "Lighting", name: "Landing", icon: "🔦", type: "button", command: "LANDING_LIGHTS_TOGGLE", stateKey: "landing_state" },
             
             "ap_master": { category: "Autopilot", name: "AP Master", icon: "✈️", type: "button", command: "AP_MASTER", stateKey: "ap_master_state" },
-            "ap_fd": { category: "Autopilot", name: "Flight Dir", icon: "📐", type: "button", command: "TOGGLE_FLIGHT_DIRECTOR", stateKey: "fd_state" },
             "ap_hdg_hold": { category: "Autopilot", name: "HDG Hold", icon: "🎯", type: "button", command: "AP_PANEL_HEADING_HOLD", stateKey: "ap_hdg_state" },
-            "ap_nav_hold": { category: "Autopilot", name: "NAV Hold", icon: "🗺️", type: "button", command: "AP_NAV1_HOLD", stateKey: "ap_nav_state" },
             "ap_alt_hold": { category: "Autopilot", name: "ALT Hold", icon: "⏫", type: "button", command: "AP_PANEL_ALTITUDE_HOLD", stateKey: "ap_alt_state" },
-            "ap_vs_hold": { category: "Autopilot", name: "VS Hold", icon: "📈", type: "button", command: "AP_PANEL_VS_HOLD", stateKey: "ap_vs_state" },
-            "ap_apr_hold": { category: "Autopilot", name: "Approach", icon: "🛬", type: "button", command: "AP_APR_HOLD", stateKey: "ap_apr_state" },
             
             "gauge_rpm": { category: "Telemetry", name: "Engine RPM", icon: "⏱️", type: "gauge", dataKey: "rpm", unit: "" },
-            "gauge_flaps": { category: "Telemetry", name: "Flaps %", icon: "📐", type: "gauge", dataKey: "flaps_pct", unit: "%" },
-            "gauge_fuel": { category: "Telemetry", name: "Fuel Qty", icon: "⛽", type: "gauge", dataKey: "fuel_pct", unit: " Gal" },
             "gauge_alt": { category: "Telemetry", name: "Altitude", icon: "⛰️", type: "gauge", dataKey: "altitude", unit: " FT" },
             "gauge_spd": { category: "Telemetry", name: "Airspeed", icon: "💨", type: "gauge", dataKey: "airspeed", unit: " KTS" },
-            "gauge_vs": { category: "Telemetry", name: "Vert Speed", icon: "↕️", type: "gauge", dataKey: "vs", unit: " FPM" },
-            "gauge_oat": { category: "Telemetry", name: "Outside Temp", icon: "🌡️", type: "gauge", dataKey: "oat", unit: "°C" },
 
             "rotary_hdg": { category: "Rotaries", name: "AP Heading", icon: "🧭", type: "rotary", dataKey: "ap_hdg", unit: "°", cmdDec: "HEADING_BUG_DEC", cmdInc: "HEADING_BUG_INC" },
-            "rotary_alt": { category: "Rotaries", name: "AP Altitude", icon: "↕️", type: "rotary", dataKey: "ap_alt", unit: " FT", cmdDec: "AP_ALT_VAR_DEC", cmdInc: "AP_ALT_VAR_INC" },
-            "rotary_vs": { category: "Rotaries", name: "AP Vert Spd", icon: "📈", type: "rotary", dataKey: "ap_vs", unit: " FPM", cmdDec: "AP_VS_VAR_DEC", cmdInc: "AP_VS_VAR_INC" },
-            "rotary_baro": { category: "Rotaries", name: "Barometer", icon: "☁️", type: "rotary", dataKey: "baro", unit: " hPa", cmdDec: "KOHLSMAN_DEC", cmdInc: "KOHLSMAN_INC" }
+            "rotary_alt": { category: "Rotaries", name: "AP Altitude", icon: "↕️", type: "rotary", dataKey: "ap_alt", unit: " FT", cmdDec: "AP_ALT_VAR_DEC", cmdInc: "AP_ALT_VAR_INC" }
         };
 
         // ==========================================
-        // 3. MULTI-PAGE STATE MANAGEMENT
+        // 3. TREE-BASED STATE MANAGEMENT
         // ==========================================
         let isEditMode = true;
         let selectedCellIndex = null;
         let currentPage = 0;
         
-        // Create an Array containing 3 distinct Pages, each with 24 empty slots
-        let pagesData = [
-            new Array(24).fill(""),
-            new Array(24).fill(""),
-            new Array(24).fill("")
-        ];
+        // 10 pages deep (Page 0 is Home)
+        let pagesData = new Array(10).fill(null).map(() => new Array(24).fill(""));
 
         layoutRef.on('value', (snapshot) => {
             const data = snapshot.val();
-            
             if (data && Array.isArray(data)) {
-                // Safely reconstruct the 3x24 array from Firebase
-                let safePages = [new Array(24).fill(""), new Array(24).fill(""), new Array(24).fill("")];
-                
-                for (let p = 0; p < 3; p++) {
+                let safePages = new Array(10).fill(null).map(() => new Array(24).fill(""));
+                for (let p = 0; p < 10; p++) {
                     if (data[p]) {
                         Object.keys(data[p]).forEach(key => {
                             let index = parseInt(key);
-                            if (!isNaN(index) && index >= 0 && index < 24) {
-                                safePages[p][index] = data[p][key];
-                            }
+                            if (!isNaN(index) && index >= 0 && index < 24) safePages[p][index] = data[p][key];
                         });
                     }
                 }
@@ -288,17 +252,9 @@
             layoutRef.set(pagesData);
         }
 
-        // --- NEW: PAGE NAVIGATION LOGIC ---
         function changePage(pageIndex) {
             currentPage = pageIndex;
-            
-            // Update Navigation UI
-            const btns = document.querySelectorAll('.page-btn');
-            btns.forEach((btn, index) => {
-                if (index === currentPage) btn.classList.add('active');
-                else btn.classList.remove('active');
-            });
-
+            document.getElementById('page-display').innerText = (currentPage === 0) ? "HOME PAGE" : `SUB-PAGE ${currentPage}`;
             renderGrid();
         }
 
@@ -308,8 +264,6 @@
         function renderGrid() {
             const grid = document.getElementById('builder-grid');
             grid.innerHTML = '';
-
-            // ONLY RENDER THE DATA FOR THE CURRENTLY SELECTED PAGE
             let currentGridState = pagesData[currentPage];
 
             currentGridState.forEach((cellData, index) => {
@@ -322,10 +276,13 @@
 
                     cell.className = `grid-cell filled type-${dictItem.type}`;
                     let valueId = `id="data-${index}"`;
+                    
+                    // Logic: Use Custom Label if it exists, otherwise use Dictionary Name
+                    let displayName = cellData.label || dictItem.name;
 
                     let innerHTML = `
                         <div class="cell-icon">${dictItem.icon}</div>
-                        <div class="cell-title">${dictItem.name}</div>
+                        <div class="cell-title">${displayName}</div>
                     `;
 
                     if (dictItem.type === 'gauge') {
@@ -348,6 +305,8 @@
                     if (!isEditMode) {
                         if (dictItem.type === 'button') {
                             cell.onclick = () => sendCommand(dictItem.command);
+                        } else if (dictItem.type === 'nav') {
+                            cell.onclick = () => changePage(cellData.targetPage || 0);
                         } else if (dictItem.type === 'rotary') {
                             cell.querySelector('.dec-btn').onclick = (e) => { e.stopPropagation(); sendCommand(dictItem.cmdDec); };
                             cell.querySelector('.inc-btn').onclick = (e) => { e.stopPropagation(); sendCommand(dictItem.cmdInc); };
@@ -360,7 +319,6 @@
                         cell.onclick = () => openModal(index);
                     }
                 }
-                
                 grid.appendChild(cell);
             });
         }
@@ -368,15 +326,7 @@
         function toggleMode() {
             isEditMode = !isEditMode;
             document.body.className = isEditMode ? 'edit-mode' : 'fly-mode';
-            
-            const btn = document.getElementById('btn-mode');
-            if (isEditMode) {
-                btn.innerHTML = "✏️ EDIT MODE";
-                btn.classList.add('edit-active');
-            } else {
-                btn.innerHTML = "🚀 FLY MODE";
-                btn.classList.remove('edit-active');
-            }
+            document.getElementById('btn-mode').innerHTML = isEditMode ? "✏️ EDIT MODE" : "🚀 FLY MODE";
             renderGrid();
         }
 
@@ -384,58 +334,58 @@
             selectedCellIndex = index;
             const list = document.getElementById('component-list');
             list.innerHTML = '';
-
             const categories = {};
             for (const [id, data] of Object.entries(DICTIONARY)) {
                 let cat = data.category || "Other";
                 if (!categories[cat]) categories[cat] = [];
                 categories[cat].push({ id, ...data });
             }
-
             for (const [catName, items] of Object.entries(categories)) {
                 const header = document.createElement('div');
                 header.className = 'category-header';
                 header.innerText = catName;
                 list.appendChild(header);
-
                 items.forEach(data => {
                     const item = document.createElement('div');
                     item.className = 'component-item';
-                    
-                    let tagColor = 'var(--accent-green)'; 
-                    if (data.type === 'gauge') tagColor = 'var(--accent-blue)';
-                    if (data.type === 'rotary') tagColor = 'var(--accent-yellow)';
-
-                    item.innerHTML = `
-                        <span style="font-size: 20px;">${data.icon}</span> 
-                        <span>${data.name}</span>
-                        <span class="component-tag" style="color: ${tagColor}">${data.type.toUpperCase()}</span>
-                    `;
+                    item.innerHTML = `<span>${data.icon}</span> <span>${data.name}</span>`;
                     item.onclick = () => assignCell(data.id);
                     list.appendChild(item);
                 });
             }
-
             document.getElementById('component-modal').style.display = 'flex';
         }
 
         function closeModal() {
             document.getElementById('component-modal').style.display = 'none';
-            selectedCellIndex = null;
         }
 
         function assignCell(componentId) {
-            if (selectedCellIndex !== null) {
-                // IMPORTANT: Save to the CURRENT PAGE'S array
-                pagesData[currentPage][selectedCellIndex] = { id: componentId };
-                saveLayout(); 
-                closeModal();
+            const dictItem = DICTIONARY[componentId];
+            let label = null;
+            let targetPage = null;
+
+            // SPECIAL LOGIC FOR FOLDERS
+            if (componentId === "nav_folder") {
+                label = prompt("Enter Folder Name (e.g. LIGHTS):", "NEW FOLDER");
+                if (!label) return;
+                let pageStr = prompt("Link to Page # (1-9):", "1");
+                targetPage = parseInt(pageStr);
+                if (isNaN(targetPage) || targetPage < 1 || targetPage > 9) return;
             }
+
+            pagesData[currentPage][selectedCellIndex] = { 
+                id: componentId, 
+                label: label, 
+                targetPage: targetPage || dictItem.targetPage 
+            };
+            
+            saveLayout(); 
+            closeModal();
         }
 
         function clearCell(event, index) {
             event.stopPropagation(); 
-            // IMPORTANT: Clear from the CURRENT PAGE'S array
             pagesData[currentPage][index] = ""; 
             saveLayout(); 
         }
@@ -461,38 +411,26 @@
         function connect() {
             ws = new WebSocket('wss://msfs-relay.onrender.com');
             ws.onopen = () => updateStatus('connected');
-            
             ws.onmessage = (event) => {
                 try {
                     const data = JSON.parse(event.data);
-                    
                     if (!isEditMode) {
-                        // WE ONLY UPDATE DOM ELEMENTS ON THE ACTIVE PAGE
                         pagesData[currentPage].forEach((cellData, index) => {
                             if (cellData && cellData.id) {
                                 const dictItem = DICTIONARY[cellData.id];
-                                
                                 if (dictItem && (dictItem.type === 'gauge' || dictItem.type === 'rotary')) {
                                     const simValue = data[dictItem.dataKey];
                                     if (simValue !== undefined) {
-                                        const valueDivs = document.querySelectorAll(`#data-${index}`);
-                                        valueDivs.forEach(div => {
-                                            div.innerText = Math.round(simValue) + (dictItem.unit || '');
-                                        });
+                                        const valEl = document.getElementById(`data-${index}`);
+                                        if (valEl) valEl.innerText = Math.round(simValue) + (dictItem.unit || '');
                                     }
                                 }
-                                
                                 if (dictItem && dictItem.type === 'button' && dictItem.stateKey) {
                                     const stateValue = data[dictItem.stateKey];
-                                    if (stateValue !== undefined) {
-                                        const cellEl = document.getElementById(`cell-${index}`);
-                                        if (cellEl) {
-                                            if (stateValue === 1 || stateValue === true) {
-                                                cellEl.classList.add('active');
-                                            } else {
-                                                cellEl.classList.remove('active');
-                                            }
-                                        }
+                                    const cellEl = document.getElementById(`cell-${index}`);
+                                    if (cellEl) {
+                                        if (stateValue === 1 || stateValue === true) cellEl.classList.add('active');
+                                        else cellEl.classList.remove('active');
                                     }
                                 }
                             }
@@ -500,11 +438,7 @@
                     }
                 } catch (e) {}
             };
-            
-            ws.onclose = () => {
-                updateStatus('disconnected');
-                setTimeout(connect, 3000);
-            };
+            ws.onclose = () => { updateStatus('disconnected'); setTimeout(connect, 3000); };
         }
 
         connect();
