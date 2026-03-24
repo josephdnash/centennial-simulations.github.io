@@ -137,8 +137,6 @@
         .profile-item.active { border-color: var(--accent-blue); background: rgba(14, 165, 233, 0.1); color: var(--accent-blue); }
         .profile-item:hover:not(.active) { background: #3f3f46; }
         .create-profile-btn { background: var(--accent-green); color: black; font-weight: bold; border: none; padding: 14px; border-radius: 8px; cursor: pointer; margin-top: 16px; font-size: 14px; }
-        
-        /* THE UX FIX: Updated Button Text */
         .unpair-btn { background: transparent; color: var(--accent-red); border: 1px solid var(--accent-red); padding: 14px; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.2s; margin-top: 8px; width: 100%;}
         .unpair-btn:hover { background: rgba(239, 68, 68, 0.1); }
     </style>
@@ -227,7 +225,7 @@
         }
 
         // ==========================================
-        // 1. FIREBASE & CORE SYSTEM (Wrapped in init)
+        // 1. FIREBASE & CORE SYSTEM
         // ==========================================
         const DICTIONARY = {
             "nav_folder": { category: "EFB Tools", name: "Create Folder", icon: "📁", type: "nav" },
@@ -298,6 +296,7 @@
             "rotary_nav2_fract": { category: "Radios", name: "NAV2 Fract", icon: "📡", type: "rotary", dataKey: "nav2_stby", unit: "", decimals: 2, cmdDec: "NAV2_RADIO_FRACT_DEC", cmdInc: "NAV2_RADIO_FRACT_INC" }
         };
 
+        // UI State Variables
         let isEditMode = true;
         let selectedCellIndex = null;
         let draggedCellIndex = null; 
@@ -309,6 +308,7 @@
         let availableProfiles = [];
         let layoutListener = null;
 
+        // Firebase Refs
         let globalActiveProfileRef, profileListRef, allLayoutsRef;
 
         function initializeSystem() {
@@ -377,8 +377,8 @@
                     }
                     pagesData = safePages;
                 } else {
+                    // THE FIX: Do NOT proactively call saveLayout() here to prevent infinite Firebase loops
                     pagesData = new Array(10).fill(null).map(() => new Array(24).fill(""));
-                    saveLayout();
                 }
                 renderGrid();
             });
@@ -512,8 +512,6 @@
         // ==========================================
         // 4. COMPONENT MODAL LOGIC
         // ==========================================
-        
-        // THE UX FIX: Initialize state globally so it remembers your last selection!
         let currentModalCategory = "All";
 
         function openModal(index) {
