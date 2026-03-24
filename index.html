@@ -61,13 +61,10 @@
             background: #27272a; color: white; border: none; padding: 8px 16px; border-radius: 8px;
             font-weight: bold; cursor: pointer; transition: background 0.2s; display: flex; align-items: center; gap: 6px;
         }
-        
-        /* NEW: Clearer toggle button styling */
         .mode-toggle.edit-btn { background: #27272a; color: var(--text-muted); }
         .mode-toggle.edit-btn:hover { background: #3f3f46; color: white; }
         .mode-toggle.fly-btn { background: var(--accent-blue); color: white; }
         .mode-toggle.fly-btn:hover { background: #0284c7; }
-        
         .mode-toggle.profile-btn { background: #18181b; border: 1px solid #333; }
         .mode-toggle.profile-btn:hover { background: #27272a; }
 
@@ -143,9 +140,10 @@
         .profile-item.active { border-color: var(--accent-blue); background: rgba(14, 165, 233, 0.1); color: var(--accent-blue); }
         .profile-item:hover:not(.active) { background: #3f3f46; }
         
-        .create-profile-btn { background: var(--accent-green); color: black; font-weight: bold; border: none; padding: 14px; border-radius: 8px; cursor: pointer; margin-top: 8px; font-size: 14px; width: 100%;}
-        .duplicate-profile-btn { background: var(--accent-blue); color: white; font-weight: bold; border: none; padding: 14px; border-radius: 8px; cursor: pointer; margin-top: 8px; font-size: 14px; width: 100%; }
-
+        .btn-action { font-weight: bold; border: none; padding: 12px; border-radius: 8px; cursor: pointer; margin-top: 8px; font-size: 14px; width: 100%; }
+        .btn-primary { background: var(--accent-green); color: black; }
+        .btn-secondary { background: var(--accent-blue); color: white; }
+        .btn-outline { background: transparent; color: white; border: 1px solid #555;}
         .unpair-btn { background: transparent; color: var(--accent-red); border: 1px solid var(--accent-red); padding: 14px; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.2s; margin-top: 16px; width: 100%;}
         .unpair-btn:hover { background: rgba(239, 68, 68, 0.1); }
     </style>
@@ -173,7 +171,6 @@
             <div class="controls-row">
                 <button class="mode-toggle profile-btn" onclick="openSettingsModal()">⚙️ SETTINGS</button>
                 <button class="mode-toggle profile-btn" onclick="openProfileModal()">🛩️ <span id="ui-current-profile">Default</span></button>
-                
                 <button id="btn-mode" class="mode-toggle fly-btn" onclick="toggleMode()">🚀 GO TO FLY MODE</button>
             </div>
         </div>
@@ -195,10 +192,17 @@
     <div id="profile-modal" class="overlay">
         <div class="modal-content small">
             <h2 style="margin-top: 0; color: white;">Layout Profiles</h2>
-            <div id="profile-list" style="max-height: 250px; overflow-y: auto;"></div>
-            <button class="create-profile-btn" onclick="createNewProfile()">+ CREATE NEW LAYOUT</button>
-            <button class="duplicate-profile-btn" onclick="duplicateProfile()">👯 DUPLICATE CURRENT</button>
-            <button class="cancel-btn" style="margin-top: 8px;" onclick="closeProfileModal()">Close</button>
+            <div id="profile-list" style="max-height: 200px; overflow-y: auto; margin-bottom: 8px;"></div>
+            
+            <button class="btn-action btn-primary" onclick="createNewProfile()">+ CREATE NEW LAYOUT</button>
+            <button class="btn-action btn-secondary" onclick="duplicateProfile()">👯 DUPLICATE CURRENT</button>
+            
+            <div style="display: flex; gap: 8px; margin-top: 8px;">
+                <button class="btn-action btn-outline" style="margin-top: 0;" onclick="importProfile()">📥 IMPORT</button>
+                <button class="btn-action btn-outline" style="margin-top: 0;" onclick="shareProfile()">📤 SHARE</button>
+            </div>
+            
+            <button class="cancel-btn" style="margin-top: 16px;" onclick="closeProfileModal()">Close</button>
         </div>
     </div>
 
@@ -221,7 +225,7 @@
         // 1. STATE VARIABLES & CONFIGURATION
         // ==========================================
         let USER_PIN = localStorage.getItem("efb_pairing_pin");
-        let isEditMode = true; // Starts in Edit Mode
+        let isEditMode = true; 
         let selectedCellIndex = null;
         let draggedCellIndex = null; 
         let currentPage = 0;
@@ -234,7 +238,7 @@
         let myCustomComponents = {};
 
         // Firebase Refs
-        let globalActiveProfileRef, profileListRef, allLayoutsRef, customComponentsRef;
+        let globalActiveProfileRef, profileListRef, allLayoutsRef, customComponentsRef, sharedProfilesRef;
         let ws; // WebSocket
 
         // ==========================================
@@ -353,7 +357,6 @@
             }
         }
 
-        // --- NEW: Settings Modal Logic ---
         function openSettingsModal() { document.getElementById('settings-modal').style.display = 'flex'; }
         function closeSettingsModal() { document.getElementById('settings-modal').style.display = 'none'; }
 
@@ -377,6 +380,9 @@
             profileListRef = userDbRef.child('profile_list');
             allLayoutsRef = userDbRef.child('layouts');
             customComponentsRef = userDbRef.child('custom_components'); 
+            
+            // NEW: Public Firebase ref for sharing profiles globally
+            sharedProfilesRef = database.ref('efb_shared_profiles');
 
             let isInitializing = false;
 
@@ -407,6 +413,9 @@
             connect();
         }
 
+        // ==========================================
+        // 4. PROFILE & SHARING LOGIC
+        // ==========================================
         function loadProfile(profileName) {
             if (layoutListener && currentProfile) {
                 allLayoutsRef.child(currentProfile).off('value', layoutListener);
@@ -486,6 +495,44 @@
             }
         }
 
+        // NEW: SHARE PROFILE TO CLOUD
+        function shareProfile() {
+            if (!currentProfile) return;
+            const shareCode = "SH-" + Math.random().toString(36).substring(2, 8).toUpperCase();
+            
+            sharedProfilesRef.child(shareCode).set(pagesData).then(() => {
+                prompt("Profile shared successfully! Copy this Share Code to give to your friend:", shareCode);
+            }).catch(e => {
+                alert("Error sharing profile. Make sure Firebase rules allow writes to efb_shared_profiles.");
+                console.error(e);
+            });
+        }
+
+        // NEW: IMPORT PROFILE FROM CLOUD
+        function importProfile() {
+            let code = prompt("Enter the Share Code (e.g. SH-A1B2C3):");
+            if (!code) return;
+            code = code.trim().toUpperCase();
+            
+            sharedProfilesRef.child(code).once('value', (snapshot) => {
+                if (snapshot.exists()) {
+                    const importedData = snapshot.val();
+                    let newName = prompt("Profile found! What would you like to save it as?", "Imported Profile");
+                    if (newName && newName.trim() !== "") {
+                        let cleanName = newName.trim();
+                        allLayoutsRef.child(cleanName).set(importedData).then(() => {
+                            profileListRef.child(cleanName).set(true);
+                            globalActiveProfileRef.set(cleanName);
+                            closeProfileModal();
+                            alert("Profile imported successfully!");
+                        }).catch(e => alert("Could not save imported profile to your device."));
+                    }
+                } else {
+                    alert("Invalid or expired Share Code.");
+                }
+            }).catch(e => alert("Error communicating with the sharing server."));
+        }
+
         function changePage(pageIndex, folderName = "") {
             currentPage = pageIndex; currentFolderName = folderName;
             if (currentPage === 0) document.getElementById('breadcrumb').innerText = "HOME";
@@ -493,6 +540,9 @@
             renderGrid();
         }
 
+        // ==========================================
+        // 5. UI RENDERING & DRAG/DROP
+        // ==========================================
         function renderGrid() {
             const grid = document.getElementById('builder-grid');
             grid.innerHTML = '';
@@ -581,24 +631,24 @@
             saveLayout(); renderGrid();
         }
 
-        // --- NEW: UX Update for Mode Toggle Button ---
         function toggleMode() {
             isEditMode = !isEditMode;
             document.body.className = isEditMode ? 'edit-mode' : 'fly-mode';
             
             const btn = document.getElementById('btn-mode');
             if (isEditMode) {
-                // If we are IN Edit Mode, the button should prompt to go to Fly Mode
                 btn.innerHTML = "🚀 GO TO FLY MODE";
                 btn.className = "mode-toggle fly-btn";
             } else {
-                // If we are IN Fly Mode, the button should prompt to go to Edit Mode
                 btn.innerHTML = "✏️ GO TO EDIT MODE";
                 btn.className = "mode-toggle edit-btn";
             }
             renderGrid();
         }
 
+        // ==========================================
+        // 6. COMPONENT MODAL LOGIC
+        // ==========================================
         function openModal(index) {
             selectedCellIndex = index; 
             document.getElementById('modal-search').value = ""; 
@@ -829,6 +879,9 @@
             broadcastCustomVars();
         }
 
+        // ==========================================
+        // 7. WEBSOCKET PIPELINE
+        // ==========================================
         function broadcastCustomVars() {
             if (!ws || ws.readyState !== WebSocket.OPEN) return;
             let varsToTrack = [];
@@ -924,7 +977,7 @@
         }
 
         // ==========================================
-        // 6. EXECUTE BOOTLOADER
+        // 8. EXECUTE BOOTLOADER
         // ==========================================
         if (USER_PIN) {
             document.getElementById('lock-screen').style.display = 'none';
