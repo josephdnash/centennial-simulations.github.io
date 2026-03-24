@@ -11,6 +11,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Roboto+Mono:wght@500;700&display=swap" rel="stylesheet">
 
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
 
     <style>
@@ -28,26 +29,40 @@
             user-select: none; -webkit-user-select: none; overflow: hidden;
         }
 
-        /* --- THE LOCK SCREEN --- */
-        #lock-screen {
+        /* --- AUTH & LOCK SCREENS --- */
+        .fullscreen-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-base);
-            display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999;
+            display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 9999;
         }
-        .lock-box {
+        .auth-box {
             background: var(--bg-panel); padding: 40px; border-radius: 16px; border: 1px solid var(--border-panel);
             text-align: center; width: 90%; max-width: 400px; box-shadow: 0 20px 50px rgba(0,0,0,0.8);
         }
-        .lock-box input {
-            background: #000; color: var(--accent-blue); border: 2px solid #333; font-size: 32px; font-weight: 900;
-            text-align: center; padding: 16px; width: 100%; box-sizing: border-box; border-radius: 12px;
-            text-transform: uppercase; letter-spacing: 4px; margin-bottom: 24px; outline: none; font-family: 'Roboto Mono', monospace;
+        .auth-box input {
+            background: #000; color: white; border: 1px solid #333; font-size: 16px;
+            padding: 16px; width: 100%; box-sizing: border-box; border-radius: 8px; margin-bottom: 16px; outline: none; font-family: 'Inter', sans-serif;
         }
-        .lock-box input:focus { border-color: var(--accent-blue); }
-        .lock-box button {
+        .auth-box input:focus { border-color: var(--accent-blue); }
+        .auth-box input.pin-input {
+            color: var(--accent-blue); font-size: 32px; font-weight: 900; text-align: center; 
+            text-transform: uppercase; letter-spacing: 4px; border: 2px solid #333; border-radius: 12px;
+        }
+        .auth-box input.pin-input:focus { border-color: var(--accent-blue); }
+        
+        .auth-box button {
             background: var(--accent-blue); color: white; border: none; padding: 16px; width: 100%;
-            font-size: 18px; font-weight: 800; border-radius: 12px; cursor: pointer; transition: 0.2s;
+            font-size: 16px; font-weight: 800; border-radius: 8px; cursor: pointer; transition: 0.2s;
         }
-        .lock-box button:hover { background: #0284c7; }
+        .auth-box button:hover { background: #0284c7; }
+        
+        /* NEW: Google Auth Styles */
+        .google-btn { background: white !important; color: #333 !important; display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 16px; }
+        .google-btn:hover { background: #f4f4f5 !important; }
+        .auth-divider { display: flex; align-items: center; margin: 20px 0; color: var(--text-muted); font-size: 12px; font-weight: bold;}
+        .auth-divider hr { flex-grow: 1; border: none; border-top: 1px solid var(--border-panel); }
+        .auth-divider span { padding: 0 10px; }
+
+        .auth-toggle { color: var(--accent-blue); font-size: 14px; margin-top: 16px; cursor: pointer; text-decoration: underline; font-weight: bold;}
 
         /* APP UI */
         #app-container { display: none; flex-direction: column; height: 100%; }
@@ -150,11 +165,36 @@
 </head>
 <body class="edit-mode">
 
-    <div id="lock-screen">
-        <div class="lock-box">
+    <div id="auth-screen" class="fullscreen-overlay">
+        <div class="auth-box">
+            <h1 id="auth-title" style="margin-top: 0; font-size: 28px; color: white;">Log In</h1>
+            <p style="color: var(--text-muted); line-height: 1.5; margin-bottom: 24px;">Sign in to access your saved layouts.</p>
+            <input type="email" id="auth-email" placeholder="Email Address">
+            <input type="password" id="auth-password" placeholder="Password">
+            <button id="auth-action-btn" onclick="handleAuthAction()">LOG IN</button>
+            
+            <div class="auth-toggle" id="auth-toggle-link" onclick="toggleAuthMode()">Don't have an account? Sign Up</div>
+
+            <div class="auth-divider">
+                <hr><span>OR</span><hr>
+            </div>
+            <button class="google-btn" onclick="signInWithGoogle()">
+                <svg style="width:18px;height:18px;" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                </svg>
+                Sign in with Google
+            </button>
+        </div>
+    </div>
+
+    <div id="lock-screen" class="fullscreen-overlay">
+        <div class="auth-box">
             <h1 style="margin-top: 0; font-size: 28px; color: white;">Link Simulator</h1>
-            <p style="color: var(--text-muted); line-height: 1.5; margin-bottom: 24px;">Enter the 6-digit Pairing ID shown on the virtual panel inside Microsoft Flight Simulator.</p>
-            <input type="text" id="pin-input" maxlength="6" placeholder="A7X9BQ">
+            <p style="color: var(--text-muted); line-height: 1.5; margin-bottom: 24px;">Enter the 6-digit Pairing ID shown on the virtual panel inside MSFS.</p>
+            <input type="text" id="pin-input" class="pin-input" maxlength="6" placeholder="A7X9BQ">
             <button onclick="attemptPairing()">CONNECT DASHBOARD</button>
         </div>
     </div>
@@ -182,8 +222,9 @@
         <div class="modal-content small">
             <h2 style="margin-top: 0; color: white;">Settings</h2>
             <div style="flex-grow: 1;">
-                <p style="color: var(--text-muted); font-size: 14px; line-height: 1.5;">Manage your connection. Unpairing will disconnect this device from your simulator's layouts.</p>
-                <button class="unpair-btn" onclick="unpairDevice()">UNPAIR THIS DEVICE</button>
+                <p style="color: var(--text-muted); font-size: 14px; line-height: 1.5;">Manage your connection and account.</p>
+                <button class="unpair-btn" style="color: var(--accent-yellow); border-color: var(--accent-yellow);" onclick="unpairDevice()">UNPAIR SIMULATOR</button>
+                <button class="unpair-btn" onclick="logoutAccount()">LOG OUT</button>
             </div>
             <button class="cancel-btn" style="margin-top: 16px;" onclick="closeSettingsModal()">Close</button>
         </div>
@@ -225,6 +266,8 @@
         // 1. STATE VARIABLES & CONFIGURATION
         // ==========================================
         let USER_PIN = localStorage.getItem("efb_pairing_pin");
+        let CURRENT_UID = null; 
+        
         let isEditMode = true; 
         let selectedCellIndex = null;
         let draggedCellIndex = null; 
@@ -238,11 +281,123 @@
         let myCustomComponents = {};
 
         // Firebase Refs
+        let database;
         let globalActiveProfileRef, profileListRef, allLayoutsRef, customComponentsRef, sharedProfilesRef;
         let ws; // WebSocket
 
         // ==========================================
-        // 2. THE MEGA DICTIONARY
+        // 2. FIREBASE INITIALIZATION
+        // ==========================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyD7zsSlVfR" + "uTevKoU-2g3Xrkz5ZPLaILyQ",
+            authDomain: "msfs-panel.firebaseapp.com",
+            databaseURL: "https://msfs-panel-default-rtdb.firebaseio.com",
+            projectId: "msfs-panel",
+            storageBucket: "msfs-panel.firebasestorage.app",
+            messagingSenderId: "622903655366",
+            appId: "1:622903655366:web:12ca8db100f1c104b790c7",
+            measurementId: "G-0VN39QBKR1"
+        };
+
+        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+        database = firebase.database();
+
+        // ==========================================
+        // 3. AUTHENTICATION LOGIC
+        // ==========================================
+        let isSignUpMode = false;
+
+        function toggleAuthMode() {
+            isSignUpMode = !isSignUpMode;
+            document.getElementById('auth-title').innerText = isSignUpMode ? "Create Account" : "Log In";
+            document.getElementById('auth-action-btn').innerText = isSignUpMode ? "SIGN UP" : "LOG IN";
+            document.getElementById('auth-toggle-link').innerText = isSignUpMode ? "Already have an account? Log In" : "Don't have an account? Sign Up";
+        }
+
+        function handleAuthAction() {
+            const email = document.getElementById('auth-email').value.trim();
+            const password = document.getElementById('auth-password').value.trim();
+
+            if (!email || !password) {
+                alert("Please enter an email and password.");
+                return;
+            }
+
+            if (isSignUpMode) {
+                firebase.auth().createUserWithEmailAndPassword(email, password).catch(error => {
+                    alert("Sign Up Error: " + error.message);
+                });
+            } else {
+                firebase.auth().signInWithEmailAndPassword(email, password).catch(error => {
+                    alert("Login Error: " + error.message);
+                });
+            }
+        }
+
+        // NEW: GOOGLE SIGN-IN FUNCTION
+        function signInWithGoogle() {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            firebase.auth().signInWithPopup(provider).catch((error) => {
+                console.error("Google Auth Error:", error);
+                alert("Sign-In Error: " + error.message);
+            });
+        }
+
+        function logoutAccount() {
+            firebase.auth().signOut().then(() => {
+                location.reload();
+            });
+        }
+
+        firebase.auth().onAuthStateChanged((user) => {
+            if (user) {
+                CURRENT_UID = user.uid;
+                document.getElementById('auth-screen').style.display = 'none';
+                
+                if (USER_PIN) {
+                    document.getElementById('lock-screen').style.display = 'none';
+                    document.getElementById('app-container').style.display = 'flex';
+                    initializeDataSilos();
+                } else {
+                    document.getElementById('lock-screen').style.display = 'flex';
+                }
+            } else {
+                CURRENT_UID = null;
+                document.getElementById('auth-screen').style.display = 'flex';
+                document.getElementById('lock-screen').style.display = 'none';
+                document.getElementById('app-container').style.display = 'none';
+            }
+        });
+
+        // ==========================================
+        // 4. PIN PAIRING LOGIC
+        // ==========================================
+        function attemptPairing() {
+            const input = document.getElementById('pin-input').value.toUpperCase().trim();
+            if (input.length === 6) {
+                localStorage.setItem("efb_pairing_pin", input);
+                USER_PIN = input;
+                document.getElementById('lock-screen').style.display = 'none';
+                document.getElementById('app-container').style.display = 'flex';
+                initializeDataSilos();
+            } else {
+                alert("Please enter a valid 6-character Pairing ID.");
+            }
+        }
+
+        function unpairDevice() {
+            const confirmUnpair = confirm("Are you sure you want to unpair this simulator connection? You will need to enter the 6-digit code again to link it.");
+            if (confirmUnpair) {
+                localStorage.removeItem("efb_pairing_pin");
+                location.reload(); 
+            }
+        }
+
+        function openSettingsModal() { document.getElementById('settings-modal').style.display = 'flex'; }
+        function closeSettingsModal() { document.getElementById('settings-modal').style.display = 'none'; }
+
+        // ==========================================
+        // 5. THE MEGA DICTIONARY
         // ==========================================
         const DICTIONARY = {
             "nav_folder": { category: "EFB Tools", name: "Create Folder", icon: "📁", type: "nav" },
@@ -334,54 +489,15 @@
         }
 
         // ==========================================
-        // 3. CORE FUNCTIONS
+        // 6. DB INITIALIZATION & SILOS
         // ==========================================
-        function attemptPairing() {
-            const input = document.getElementById('pin-input').value.toUpperCase().trim();
-            if (input.length === 6) {
-                localStorage.setItem("efb_pairing_pin", input);
-                USER_PIN = input;
-                document.getElementById('lock-screen').style.display = 'none';
-                document.getElementById('app-container').style.display = 'flex';
-                initializeSystem();
-            } else {
-                alert("Please enter a valid 6-character Pairing ID.");
-            }
-        }
-
-        function unpairDevice() {
-            const confirmUnpair = confirm("Are you sure you want to unpair this device? You will lose access to all custom profiles tied to this PIN unless you pair it again.");
-            if (confirmUnpair) {
-                localStorage.removeItem("efb_pairing_pin");
-                location.reload(); 
-            }
-        }
-
-        function openSettingsModal() { document.getElementById('settings-modal').style.display = 'flex'; }
-        function closeSettingsModal() { document.getElementById('settings-modal').style.display = 'none'; }
-
-        function initializeSystem() {
-            const firebaseConfig = {
-                apiKey: "AIzaSyD7zsSlVfR" + "uTevKoU-2g3Xrkz5ZPLaILyQ",
-                authDomain: "msfs-panel.firebaseapp.com",
-                databaseURL: "https://msfs-panel-default-rtdb.firebaseio.com",
-                projectId: "msfs-panel",
-                storageBucket: "msfs-panel.firebasestorage.app",
-                messagingSenderId: "622903655366",
-                appId: "1:622903655366:web:12ca8db100f1c104b790c7",
-                measurementId: "G-0VN39QBKR1"
-            };
-
-            if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-            const database = firebase.database();
-
-            const userDbRef = database.ref('efb_users/' + USER_PIN);
+        function initializeDataSilos() {
+            const userDbRef = database.ref('users/' + CURRENT_UID);
+            
             globalActiveProfileRef = userDbRef.child('active_profile');
             profileListRef = userDbRef.child('profile_list');
             allLayoutsRef = userDbRef.child('layouts');
             customComponentsRef = userDbRef.child('custom_components'); 
-            
-            // NEW: Public Firebase ref for sharing profiles globally
             sharedProfilesRef = database.ref('efb_shared_profiles');
 
             let isInitializing = false;
@@ -392,7 +508,7 @@
                     active = "Default";
                     if (!isInitializing) {
                         isInitializing = true;
-                        globalActiveProfileRef.set(active).catch(e => console.warn("Cloud save rejected. Using local memory."));
+                        globalActiveProfileRef.set(active).catch(e => console.warn("Cloud save rejected. Check Firebase rules."));
                         profileListRef.child("Default").set(true).catch(e => {});
                     }
                 }
@@ -414,7 +530,7 @@
         }
 
         // ==========================================
-        // 4. PROFILE & SHARING LOGIC
+        // 7. PROFILE & SHARING LOGIC
         // ==========================================
         function loadProfile(profileName) {
             if (layoutListener && currentProfile) {
@@ -495,7 +611,6 @@
             }
         }
 
-        // NEW: SHARE PROFILE TO CLOUD
         function shareProfile() {
             if (!currentProfile) return;
             const shareCode = "SH-" + Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -508,7 +623,6 @@
             });
         }
 
-        // NEW: IMPORT PROFILE FROM CLOUD
         function importProfile() {
             let code = prompt("Enter the Share Code (e.g. SH-A1B2C3):");
             if (!code) return;
@@ -541,7 +655,7 @@
         }
 
         // ==========================================
-        // 5. UI RENDERING & DRAG/DROP
+        // 8. UI RENDERING & DRAG/DROP
         // ==========================================
         function renderGrid() {
             const grid = document.getElementById('builder-grid');
@@ -646,9 +760,6 @@
             renderGrid();
         }
 
-        // ==========================================
-        // 6. COMPONENT MODAL LOGIC
-        // ==========================================
         function openModal(index) {
             selectedCellIndex = index; 
             document.getElementById('modal-search').value = ""; 
@@ -880,7 +991,7 @@
         }
 
         // ==========================================
-        // 7. WEBSOCKET PIPELINE
+        // 9. WEBSOCKET PIPELINE
         // ==========================================
         function broadcastCustomVars() {
             if (!ws || ws.readyState !== WebSocket.OPEN) return;
@@ -974,15 +1085,6 @@
             if (ws && ws.readyState === WebSocket.OPEN && cmd) {
                 ws.send(JSON.stringify({ type: "SD_COMMAND", command: cmd }));
             }
-        }
-
-        // ==========================================
-        // 8. EXECUTE BOOTLOADER
-        // ==========================================
-        if (USER_PIN) {
-            document.getElementById('lock-screen').style.display = 'none';
-            document.getElementById('app-container').style.display = 'flex';
-            initializeSystem();
         }
     </script>
 </body>
