@@ -629,7 +629,13 @@
             saveLayout(); renderGrid();
         }
 
+        // --- THE FIX: We dynamically grab the DOM elements inside the function so they are never undefined!
         function updateStatus(state) {
+            const statusDot = document.getElementById('status-dot');
+            const statusText = document.getElementById('connection-status-text');
+            
+            if (!statusDot || !statusText) return; // Safety check
+            
             statusDot.className = 'status-indicator'; 
             if (state === 'connected') {
                 statusText.innerText = 'DATA LINK ESTABLISHED';
