@@ -331,13 +331,21 @@
             profileListRef = userDbRef.child('profile_list');
             allLayoutsRef = userDbRef.child('layouts');
 
+            // THE FIX: Circuit breaker to prevent infinite loops if Firebase rules reject the write.
+            let isInitializing = false;
+
             globalActiveProfileRef.on('value', (snap) => {
                 let active = snap.val();
+                
                 if (!active) {
                     active = "Default";
-                    globalActiveProfileRef.set(active);
-                    profileListRef.child("Default").set(true);
+                    if (!isInitializing) {
+                        isInitializing = true; // Engage circuit breaker
+                        globalActiveProfileRef.set(active).catch(e => console.warn("Cloud save rejected (Check Firebase Security Rules). Using local memory."));
+                        profileListRef.child("Default").set(true).catch(e => {});
+                    }
                 }
+                
                 if (currentProfile !== active) loadProfile(active);
             });
 
@@ -355,10 +363,13 @@
         // 2. PROFILE & DB LOGIC
         // ==========================================
         function loadProfile(profileName) {
+            // THE FIX: Properly detach the listener from the OLD profile before switching!
+            if (layoutListener && currentProfile) {
+                allLayoutsRef.child(currentProfile).off('value', layoutListener);
+            }
+            
             currentProfile = profileName;
             document.getElementById('ui-current-profile').innerText = profileName.toUpperCase();
-            
-            if (layoutListener) allLayoutsRef.child(currentProfile).off('value', layoutListener);
             
             currentPage = 0; currentFolderName = "";
             document.getElementById('breadcrumb').innerText = "HOME";
@@ -377,7 +388,6 @@
                     }
                     pagesData = safePages;
                 } else {
-                    // THE FIX: Do NOT proactively call saveLayout() here to prevent infinite Firebase loops
                     pagesData = new Array(10).fill(null).map(() => new Array(24).fill(""));
                 }
                 renderGrid();
@@ -385,7 +395,9 @@
         }
 
         function saveLayout() {
-            if (currentProfile) allLayoutsRef.child(currentProfile).set(pagesData);
+            if (currentProfile) {
+                allLayoutsRef.child(currentProfile).set(pagesData).catch(e => console.warn("Layout save rejected by Firebase."));
+            }
         }
 
         function openProfileModal() { renderProfileList(); document.getElementById('profile-modal').style.display = 'flex'; }
@@ -399,7 +411,10 @@
                 const item = document.createElement('div');
                 item.className = `profile-item ${prof === currentProfile ? 'active' : ''}`;
                 item.innerHTML = `<span>🛩️ ${prof}</span> ${prof === currentProfile ? '<span>(ACTIVE)</span>' : ''}`;
-                item.onclick = () => { globalActiveProfileRef.set(prof); closeProfileModal(); };
+                item.onclick = () => { 
+                    globalActiveProfileRef.set(prof).catch(e => {}); 
+                    closeProfileModal(); 
+                };
                 list.appendChild(item);
             });
         }
@@ -408,8 +423,8 @@
             let newName = prompt("Enter a name for the new layout (e.g. Cessna 152):");
             if (newName && newName.trim() !== "") {
                 let cleanName = newName.trim();
-                profileListRef.child(cleanName).set(true);
-                globalActiveProfileRef.set(cleanName);
+                profileListRef.child(cleanName).set(true).catch(e => {});
+                globalActiveProfileRef.set(cleanName).catch(e => {});
                 closeProfileModal();
             }
         }
