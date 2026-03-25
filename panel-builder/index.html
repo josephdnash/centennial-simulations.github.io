@@ -277,6 +277,7 @@
         let selectedCellIndex = null;
         let draggedCellIndex = null; 
         let currentPage = 0;
+        let currentFolderName = "";
         let pagesData = new Array(10).fill(null).map(() => new Array(24).fill(""));
         let currentProfile = "";
         let availableProfiles = [];
@@ -562,7 +563,6 @@
             currentProfile = profileName;
             document.getElementById('ui-current-profile').innerText = profileName.toUpperCase();
             
-            // Use the new changePage wrapper so breadcrumbs always map correctly
             changePage(0);
 
             layoutListener = allLayoutsRef.child(profileName).on('value', (snapshot) => {
@@ -581,9 +581,7 @@
                 } else {
                     pagesData = new Array(10).fill(null).map(() => new Array(24).fill(""));
                 }
-                
-                // Re-evaluate breadcrumb just in case folder names changed
-                changePage(currentPage);
+                renderGrid();
                 broadcastCustomVars();
             });
         }
@@ -675,6 +673,7 @@
             });
         }
 
+        // NEW: LIBRARY EXTRACTION LOGIC IN IMPORT
         function importProfile() {
             let code = prompt("Enter the Share Code (e.g. SH-A1B2C3):");
             if (!code) return;
@@ -686,6 +685,39 @@
                     let newName = prompt("Profile found! What would you like to save it as?", "Imported Profile");
                     if (newName && newName.trim() !== "") {
                         let cleanName = newName.trim();
+                        
+                        // Extract Custom Components into the user's library
+                        let newCustoms = {};
+                        for (let p = 0; p < 10; p++) {
+                            if (!importedData[p]) continue;
+                            importedData[p].forEach(cell => {
+                                if (cell && cell.customVar) {
+                                    // Check if we already have this specific custom var in our library
+                                    let exists = Object.values(myCustomComponents).some(
+                                        existing => existing.customVar === cell.customVar && existing.baseType === (cell.baseType || cell.id)
+                                    );
+                                    if (!exists) {
+                                        const customId = "imported_custom_" + Math.random().toString(36).substr(2, 9);
+                                        newCustoms[customId] = {
+                                            baseType: cell.baseType || cell.id,
+                                            label: cell.label,
+                                            customVar: cell.customVar,
+                                            customUnit: cell.customUnit || "number",
+                                            customCmd: cell.customCmd || "",
+                                            customDisplayUnit: cell.customDisplayUnit || ""
+                                        };
+                                        // Update local dict immediately to prevent duplicate extractions in the same loop
+                                        myCustomComponents[customId] = newCustoms[customId];
+                                    }
+                                }
+                            });
+                        }
+
+                        // Push new components to DB
+                        if (Object.keys(newCustoms).length > 0) {
+                            customComponentsRef.update(newCustoms);
+                        }
+
                         allLayoutsRef.child(cleanName).set(importedData).then(() => {
                             profileListRef.child(cleanName).set(true);
                             globalActiveProfileRef.set(cleanName);
@@ -699,26 +731,10 @@
             }).catch(e => alert("Error communicating with the sharing server."));
         }
 
-        // NEW: Dynamic Breadcrumbs. No longer relies on button name strings.
-        function changePage(pageIndex) {
-            currentPage = pageIndex; 
-            
-            if (currentPage === 0) {
-                document.getElementById('breadcrumb').innerText = "HOME";
-            } else {
-                let folderName = "FOLDER";
-                // Scan the grid to find the button that links to this page, and use its label!
-                for (let p = 0; p < 10; p++) {
-                    if (pagesData[p]) {
-                        let folderBtn = pagesData[p].find(c => c && c.id === "nav_folder" && c.targetPage === currentPage);
-                        if (folderBtn && folderBtn.label) { 
-                            folderName = folderBtn.label; 
-                            break; 
-                        }
-                    }
-                }
-                document.getElementById('breadcrumb').innerText = `HOME > ${folderName}`;
-            }
+        function changePage(pageIndex, folderName = "") {
+            currentPage = pageIndex; currentFolderName = folderName;
+            if (currentPage === 0) document.getElementById('breadcrumb').innerText = "HOME";
+            else document.getElementById('breadcrumb').innerText = `HOME > ${currentFolderName}`;
             renderGrid();
         }
 
@@ -770,7 +786,7 @@
                         } else if (dictItem.type === 'button') {
                             cell.onclick = () => sendCommand(dictItem.command);
                         } else if (dictItem.type === 'nav') {
-                            cell.onclick = () => changePage(cellData.targetPage || 0);
+                            cell.onclick = () => changePage(cellData.targetPage || 0, cellData.label || "");
                         } else if (dictItem.type === 'rotary') {
                             cell.querySelector('.dec-btn').onclick = (e) => { e.stopPropagation(); sendCommand(dictItem.cmdDec); };
                             cell.querySelector('.inc-btn').onclick = (e) => { e.stopPropagation(); sendCommand(dictItem.cmdInc); };
@@ -975,7 +991,6 @@
                 if (foundPage === -1) { alert("Maximum folder limit (9 folders) reached!"); return; }
                 
                 targetPage = foundPage;
-                // Auto-place the dynamic Page Back button, pointing to the CURRENT page
                 pagesData[targetPage][0] = { id: "nav_back", label: "Back", targetPage: currentPage };
                 pagesData[currentPage][selectedCellIndex] = { id: componentId, label: label, targetPage: targetPage };
             
@@ -983,7 +998,6 @@
                 pagesData[currentPage][selectedCellIndex] = { id: componentId, label: "Home", targetPage: 0 };
             
             } else if (componentId === "nav_back") {
-                // If manually placed, dynamically find the parent of the current page!
                 let parentPage = 0;
                 for (let i = 0; i < 10; i++) {
                     if (pagesData[i]) {
