@@ -277,7 +277,6 @@
         let selectedCellIndex = null;
         let draggedCellIndex = null; 
         let currentPage = 0;
-        let currentFolderName = "";
         let pagesData = new Array(10).fill(null).map(() => new Array(24).fill(""));
         let currentProfile = "";
         let availableProfiles = [];
@@ -422,7 +421,9 @@
         // ==========================================
         const DICTIONARY = {
             "nav_folder": { category: "EFB Tools", name: "Create Folder", icon: "📁", type: "nav" },
-            "nav_back": { category: "EFB Tools", name: "Back to Home", icon: "⬅️", type: "nav", targetPage: 0 },
+            "nav_back": { category: "EFB Tools", name: "Page Back", icon: "⬅️", type: "nav" },
+            "nav_home": { category: "EFB Tools", name: "Back to Home", icon: "🏠", type: "nav", targetPage: 0 },
+            
             "custom_button": { category: "Custom Variables", name: "Custom Button", icon: "🕹️", type: "button", isCustom: true },
             "custom_gauge": { category: "Custom Variables", name: "Custom Gauge", icon: "🛠️", type: "gauge", isCustom: true },
             "radio_com1_swap": { category: "Radios", name: "COM 1 Swap", icon: "📻", type: "button", command: "COM_STBY_RADIO_SWAP" },
@@ -561,8 +562,8 @@
             currentProfile = profileName;
             document.getElementById('ui-current-profile').innerText = profileName.toUpperCase();
             
-            currentPage = 0; currentFolderName = "";
-            document.getElementById('breadcrumb').innerText = "HOME";
+            // Use the new changePage wrapper so breadcrumbs always map correctly
+            changePage(0);
 
             layoutListener = allLayoutsRef.child(profileName).on('value', (snapshot) => {
                 const data = snapshot.val();
@@ -580,7 +581,9 @@
                 } else {
                     pagesData = new Array(10).fill(null).map(() => new Array(24).fill(""));
                 }
-                renderGrid();
+                
+                // Re-evaluate breadcrumb just in case folder names changed
+                changePage(currentPage);
                 broadcastCustomVars();
             });
         }
@@ -632,7 +635,6 @@
             }
         }
 
-        // NEW: RENAME PROFILE FUNCTION
         function renameProfile() {
             if (!currentProfile || currentProfile === "Default") {
                 alert("The 'Default' profile cannot be renamed.");
@@ -697,10 +699,26 @@
             }).catch(e => alert("Error communicating with the sharing server."));
         }
 
-        function changePage(pageIndex, folderName = "") {
-            currentPage = pageIndex; currentFolderName = folderName;
-            if (currentPage === 0) document.getElementById('breadcrumb').innerText = "HOME";
-            else document.getElementById('breadcrumb').innerText = `HOME > ${currentFolderName}`;
+        // NEW: Dynamic Breadcrumbs. No longer relies on button name strings.
+        function changePage(pageIndex) {
+            currentPage = pageIndex; 
+            
+            if (currentPage === 0) {
+                document.getElementById('breadcrumb').innerText = "HOME";
+            } else {
+                let folderName = "FOLDER";
+                // Scan the grid to find the button that links to this page, and use its label!
+                for (let p = 0; p < 10; p++) {
+                    if (pagesData[p]) {
+                        let folderBtn = pagesData[p].find(c => c && c.id === "nav_folder" && c.targetPage === currentPage);
+                        if (folderBtn && folderBtn.label) { 
+                            folderName = folderBtn.label; 
+                            break; 
+                        }
+                    }
+                }
+                document.getElementById('breadcrumb').innerText = `HOME > ${folderName}`;
+            }
             renderGrid();
         }
 
@@ -752,7 +770,7 @@
                         } else if (dictItem.type === 'button') {
                             cell.onclick = () => sendCommand(dictItem.command);
                         } else if (dictItem.type === 'nav') {
-                            cell.onclick = () => changePage(cellData.targetPage || 0, cellData.label || "");
+                            cell.onclick = () => changePage(cellData.targetPage || 0);
                         } else if (dictItem.type === 'rotary') {
                             cell.querySelector('.dec-btn').onclick = (e) => { e.stopPropagation(); sendCommand(dictItem.cmdDec); };
                             cell.querySelector('.inc-btn').onclick = (e) => { e.stopPropagation(); sendCommand(dictItem.cmdInc); };
@@ -882,7 +900,7 @@
             const dictItem = combinedDict[cellData.id];
             let currentName = cellData.label || (dictItem ? dictItem.name : "BUTTON");
 
-            if (cellData.id === "nav_folder" || cellData.id === "nav_back") {
+            if (cellData.id === "nav_folder" || cellData.id === "nav_back" || cellData.id === "nav_home") {
                 let newLabel = prompt("Rename this button:", currentName);
                 if (newLabel !== null && newLabel.trim() !== "") {
                     pagesData[currentPage][index].label = newLabel.trim();
@@ -957,11 +975,23 @@
                 if (foundPage === -1) { alert("Maximum folder limit (9 folders) reached!"); return; }
                 
                 targetPage = foundPage;
-                pagesData[targetPage][0] = { id: "nav_back", label: "Back", targetPage: 0 };
+                // Auto-place the dynamic Page Back button, pointing to the CURRENT page
+                pagesData[targetPage][0] = { id: "nav_back", label: "Back", targetPage: currentPage };
                 pagesData[currentPage][selectedCellIndex] = { id: componentId, label: label, targetPage: targetPage };
             
+            } else if (componentId === "nav_home") {
+                pagesData[currentPage][selectedCellIndex] = { id: componentId, label: "Home", targetPage: 0 };
+            
             } else if (componentId === "nav_back") {
-                pagesData[currentPage][selectedCellIndex] = { id: componentId, label: "Back", targetPage: 0 };
+                // If manually placed, dynamically find the parent of the current page!
+                let parentPage = 0;
+                for (let i = 0; i < 10; i++) {
+                    if (pagesData[i]) {
+                        let isParent = pagesData[i].some(cell => cell && cell.id === "nav_folder" && cell.targetPage === currentPage);
+                        if (isParent) { parentPage = i; break; }
+                    }
+                }
+                pagesData[currentPage][selectedCellIndex] = { id: componentId, label: "Back", targetPage: parentPage };
             
             } else if (dictItem.isSavedCustom) {
                 pagesData[currentPage][selectedCellIndex] = {
