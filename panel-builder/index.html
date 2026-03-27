@@ -265,8 +265,13 @@
                 
                 <div style="margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--border-panel);">
                     <label style="color: var(--text-muted); font-size: 10px; font-weight: bold; text-transform: uppercase;">Aircraft Specific Presets</label>
-                    <select id="modal-aircraft-select" style="width: 100%; background: #000; color: white; border: 1px solid #333; padding: 12px; border-radius: 8px; margin-top: 8px; outline: none; font-family: 'Inter', sans-serif; cursor: pointer;" onchange="loadAircraftPresets()">
+                    
+                    <select id="modal-vendor-select" style="width: 100%; background: #000; color: white; border: 1px solid #333; padding: 12px; border-radius: 8px; margin-top: 8px; outline: none; font-family: 'Inter', sans-serif; cursor: pointer;" onchange="loadAircraftForVendor()">
                         <option value="none">Standard Controls Only</option>
+                    </select>
+
+                    <select id="modal-aircraft-select" style="width: 100%; background: #000; color: white; border: 1px solid #333; padding: 12px; border-radius: 8px; margin-top: 8px; outline: none; font-family: 'Inter', sans-serif; cursor: pointer; display: none;" onchange="loadAircraftPresets()">
+                        <option value="none">Select Aircraft...</option>
                     </select>
                 </div>
 
@@ -301,10 +306,12 @@
         let currentModalCategory = "All";
         let myCustomComponents = {};
         
-        // NEW: HubHop State Variables
+        // HubHop State Variables
+        let availableVendors = [];
+        let currentSelectedVendor = "none";
         let availableAircraft = [];
-        let hubhopComponents = {};
         let currentSelectedAircraft = "none";
+        let hubhopComponents = {};
 
         // Firebase Refs
         let database;
@@ -442,23 +449,55 @@
         function closeSettingsModal() { document.getElementById('settings-modal').style.display = 'none'; }
 
         // ==========================================
-        // 5. HUBHOP API FETCHING
+        // 5. HUBHOP API FETCHING (TWO-STEP)
         // ==========================================
-        async function fetchAircraftList() {
+        async function fetchVendorList() {
             try {
-                const response = await fetch(`${API_BASE_URL}/api/aircraft`);
-                availableAircraft = await response.json();
+                const response = await fetch(`${API_BASE_URL}/api/vendors`);
+                availableVendors = await response.json();
                 
-                const select = document.getElementById('modal-aircraft-select');
-                availableAircraft.forEach(ac => {
+                const select = document.getElementById('modal-vendor-select');
+                availableVendors.forEach(v => {
                     let opt = document.createElement('option');
-                    opt.value = ac;
-                    opt.innerText = ac;
+                    opt.value = v;
+                    opt.innerText = v;
                     select.appendChild(opt);
                 });
             } catch(e) {
-                console.warn("Failed to reach preset server. Running in offline mode.");
+                console.warn("Failed to reach preset server.");
             }
+        }
+
+        async function loadAircraftForVendor() {
+            const vendorSelect = document.getElementById('modal-vendor-select');
+            const aircraftSelect = document.getElementById('modal-aircraft-select');
+            currentSelectedVendor = vendorSelect.value;
+            
+            // Reset state
+            hubhopComponents = {};
+            currentSelectedAircraft = "none";
+            aircraftSelect.innerHTML = '<option value="none">Select Aircraft...</option>';
+            
+            if (currentSelectedVendor === "none") {
+                aircraftSelect.style.display = "none";
+            } else {
+                aircraftSelect.style.display = "block";
+                try {
+                    const response = await fetch(`${API_BASE_URL}/api/aircraft/${encodeURIComponent(currentSelectedVendor)}`);
+                    const planes = await response.json();
+                    
+                    planes.forEach(ac => {
+                        let opt = document.createElement('option');
+                        opt.value = ac;
+                        opt.innerText = ac;
+                        aircraftSelect.appendChild(opt);
+                    });
+                } catch(e) { console.error("Failed to load aircraft", e); }
+            }
+            
+            currentModalCategory = "All"; 
+            renderModalCategories();
+            filterModal();
         }
 
         async function loadAircraftPresets() {
@@ -466,9 +505,9 @@
             currentSelectedAircraft = select.value;
             hubhopComponents = {}; 
 
-            if (currentSelectedAircraft !== "none") {
+            if (currentSelectedAircraft !== "none" && currentSelectedVendor !== "none") {
                 try {
-                    const response = await fetch(`${API_BASE_URL}/api/presets/${encodeURIComponent(currentSelectedAircraft)}`);
+                    const response = await fetch(`${API_BASE_URL}/api/presets/${encodeURIComponent(currentSelectedVendor)}/${encodeURIComponent(currentSelectedAircraft)}`);
                     const presets = await response.json();
                     
                     presets.forEach(p => {
@@ -483,9 +522,7 @@
                             baseType: "custom_button"
                         };
                     });
-                } catch(e) { 
-                    console.error("Failed to load specific aircraft presets", e); 
-                }
+                } catch(e) { console.error("Failed to load presets", e); }
             }
             
             currentModalCategory = "All"; 
@@ -601,7 +638,6 @@
             "rotary_magneto": { category: "Rotaries", name: "Ignition Key", icon: "🔑", type: "rotary", dataKey: "magneto_state", unit: "", cmdDec: "MAGNETO1_DEC", cmdInc: "MAGNETO1_INC" }
         };
 
-        // NEW: Injects fetched HubHop buttons right into the dictionary
         function getCombinedDictionary() {
             let combined = { ...DICTIONARY };
             if (myCustomComponents) {
@@ -637,8 +673,8 @@
             customComponentsRef = userDbRef.child('custom_components'); 
             sharedProfilesRef = database.ref('efb_shared_profiles');
 
-            // Boot up the HubHop List
-            fetchAircraftList();
+            // NEW: Boot up the HubHop Vendor List
+            fetchVendorList();
 
             let isInitializing = false;
 
@@ -1030,7 +1066,7 @@
                 if (data.type === 'rotary') tagColor = 'var(--accent-yellow)';
                 if (data.type === 'nav') tagColor = 'var(--accent-purple)';
                 if (data.isSavedCustom) tagColor = 'var(--accent-red)'; 
-                if (data.isHubHop) tagColor = 'var(--accent-purple)'; // NEW: Special color for HubHop imports
+                if (data.isHubHop) tagColor = 'var(--accent-purple)';
 
                 item.innerHTML = `
                     <span style="font-size: 24px; min-width: 32px; text-align: center;">${data.icon}</span> 
@@ -1107,7 +1143,6 @@
             }
         }
 
-        // NEW: Logic added to seamlessly handle HubHop buttons and save them like custom buttons
         function assignCell(componentId) {
             if (selectedCellIndex === null) return;
             
