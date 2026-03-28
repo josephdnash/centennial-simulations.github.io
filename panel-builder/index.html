@@ -152,9 +152,11 @@
         .component-item:active { border-color: var(--accent-blue); transform: scale(0.98); }
         .component-tag { font-size: 10px; background: #000; padding: 4px 8px; border-radius: 6px; color: var(--text-muted); margin-left: auto; letter-spacing: 0.5px;}
 
-        .profile-item { background: #27272a; padding: 16px; border-radius: 8px; margin-bottom: 8px; cursor: pointer; font-weight: bold; color: white; border: 2px solid transparent; display: flex; justify-content: space-between; }
+        .profile-item { background: #27272a; padding: 16px; border-radius: 8px; margin-bottom: 8px; cursor: pointer; font-weight: bold; color: white; border: 2px solid transparent; display: flex; flex-direction: column; justify-content: center; position: relative;}
         .profile-item.active { border-color: var(--accent-blue); background: rgba(14, 165, 233, 0.1); color: var(--accent-blue); }
         .profile-item:hover:not(.active) { background: #3f3f46; }
+        .profile-title { font-size: 16px; display: flex; justify-content: space-between;}
+        .profile-tag { font-size: 11px; color: var(--text-muted); margin-top: 4px; font-weight: normal; }
         
         .btn-action { font-weight: bold; border: none; padding: 12px; border-radius: 8px; cursor: pointer; margin-top: 8px; font-size: 14px; width: 100%; }
         .btn-primary { background: var(--accent-green); color: black; }
@@ -241,7 +243,7 @@
     <div id="profile-modal" class="overlay">
         <div class="modal-content small">
             <h2 style="margin-top: 0; color: white;">Layout Profiles</h2>
-            <div id="profile-list" style="max-height: 200px; overflow-y: auto; margin-bottom: 8px;"></div>
+            <div id="profile-list" style="max-height: 250px; overflow-y: auto; margin-bottom: 8px;"></div>
             
             <button class="btn-action btn-primary" onclick="createNewProfile()">+ CREATE NEW LAYOUT</button>
             <div style="display: flex; gap: 8px; margin-top: 8px;">
@@ -263,19 +265,7 @@
             <div class="modal-sidebar">
                 <h2 style="margin-top: 0; margin-bottom: 12px; font-size: 18px; color: white;">Library</h2>
                 
-                <div style="margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--border-panel);">
-                    <label style="color: var(--text-muted); font-size: 10px; font-weight: bold; text-transform: uppercase;">Aircraft Specific Presets</label>
-                    
-                    <select id="modal-vendor-select" style="width: 100%; background: #000; color: white; border: 1px solid #333; padding: 12px; border-radius: 8px; margin-top: 8px; outline: none; font-family: 'Inter', sans-serif; cursor: pointer;" onchange="loadAircraftForVendor()">
-                        <option value="none">Standard Controls Only</option>
-                    </select>
-
-                    <select id="modal-aircraft-select" style="width: 100%; background: #000; color: white; border: 1px solid #333; padding: 12px; border-radius: 8px; margin-top: 8px; outline: none; font-family: 'Inter', sans-serif; cursor: pointer; display: none;" onchange="loadAircraftPresets()">
-                        <option value="none">Select Aircraft...</option>
-                    </select>
-                </div>
-
-                <div id="modal-categories" style="display: flex; flex-direction: column; overflow-y: auto; flex-grow: 1;"></div>
+                <div id="modal-categories" style="display: flex; flex-direction: column; overflow-y: auto; flex-grow: 1; border-top: 1px solid var(--border-panel); padding-top: 16px;"></div>
                 <button class="cancel-btn" onclick="closeModal()">Close</button>
             </div>
             <div class="modal-main">
@@ -289,8 +279,6 @@
         // ==========================================
         // 1. STATE VARIABLES & CONFIGURATION
         // ==========================================
-        const API_BASE_URL = "https://msfs-relay.onrender.com";
-
         let USER_PIN = localStorage.getItem("efb_pairing_pin");
         let CURRENT_UID = null; 
         
@@ -298,28 +286,19 @@
         let selectedCellIndex = null;
         let draggedCellIndex = null; 
         let currentPage = 0;
-        let currentFolderName = "";
         let pagesData = new Array(10).fill(null).map(() => new Array(24).fill(""));
         let currentProfile = "";
-        let availableProfiles = [];
+        let availableProfiles = {};
         let layoutListener = null;
         let currentModalCategory = "All";
         let myCustomComponents = {};
         
-        // NEW: GLOBAL SIM STATE (Used by Smart Toggles to read live telemetry)
         let currentSimState = {};
-
-        // HubHop State Variables
-        let availableVendors = [];
-        let currentSelectedVendor = "none";
-        let availableAircraft = [];
-        let currentSelectedAircraft = "none";
-        let hubhopComponents = {};
 
         // Firebase Refs
         let database;
         let globalActiveProfileRef, profileListRef, allLayoutsRef, customComponentsRef, sharedProfilesRef;
-        let ws; // WebSocket
+        let ws; 
 
         // ==========================================
         // 2. FIREBASE INITIALIZATION
@@ -445,97 +424,15 @@
         }
         function closeSettingsModal() { document.getElementById('settings-modal').style.display = 'none'; }
 
-        // ==========================================
-        // 5. HUBHOP API FETCHING
-        // ==========================================
-        async function fetchVendorList() {
-            try {
-                const response = await fetch(`${API_BASE_URL}/api/vendors`);
-                availableVendors = await response.json();
-                
-                const select = document.getElementById('modal-vendor-select');
-                availableVendors.forEach(v => {
-                    let opt = document.createElement('option');
-                    opt.value = v;
-                    opt.innerText = v;
-                    select.appendChild(opt);
-                });
-            } catch(e) {
-                console.warn("Failed to reach preset server.");
-            }
-        }
-
-        async function loadAircraftForVendor() {
-            const vendorSelect = document.getElementById('modal-vendor-select');
-            const aircraftSelect = document.getElementById('modal-aircraft-select');
-            currentSelectedVendor = vendorSelect.value;
-            
-            hubhopComponents = {};
-            currentSelectedAircraft = "none";
-            aircraftSelect.innerHTML = '<option value="none">Select Aircraft...</option>';
-            
-            if (currentSelectedVendor === "none") {
-                aircraftSelect.style.display = "none";
-            } else {
-                aircraftSelect.style.display = "block";
-                try {
-                    const response = await fetch(`${API_BASE_URL}/api/aircraft/${encodeURIComponent(currentSelectedVendor)}`);
-                    const planes = await response.json();
-                    
-                    planes.forEach(ac => {
-                        let opt = document.createElement('option');
-                        opt.value = ac;
-                        opt.innerText = ac;
-                        aircraftSelect.appendChild(opt);
-                    });
-                } catch(e) { console.error("Failed to load aircraft", e); }
-            }
-            
-            currentModalCategory = "All"; 
-            renderModalCategories();
-            filterModal();
-        }
-
-        async function loadAircraftPresets() {
-            const select = document.getElementById('modal-aircraft-select');
-            currentSelectedAircraft = select.value;
-            hubhopComponents = {}; 
-
-            if (currentSelectedAircraft !== "none" && currentSelectedVendor !== "none") {
-                try {
-                    const response = await fetch(`${API_BASE_URL}/api/presets/${encodeURIComponent(currentSelectedVendor)}/${encodeURIComponent(currentSelectedAircraft)}`);
-                    const presets = await response.json();
-                    
-                    presets.forEach(p => {
-                        let id = "hubhop_" + Math.random().toString(36).substr(2, 9);
-                        hubhopComponents[id] = {
-                            category: "⭐ " + p.aircraft, 
-                            name: p.label,
-                            icon: "✨",
-                            type: "button",
-                            customCmd: p.command,
-                            isHubHop: true,
-                            baseType: "custom_button"
-                        };
-                    });
-                } catch(e) { console.error("Failed to load presets", e); }
-            }
-            
-            currentModalCategory = "All"; 
-            renderModalCategories();
-            filterModal();
-        }
 
         // ==========================================
-        // 6. THE MEGA DICTIONARY
+        // 5. THE EXPANDED MEGA DICTIONARY
         // ==========================================
         const DICTIONARY = {
-            // EFB Tools
+            // EFB Tools & Custom
             "nav_folder": { category: "EFB Tools", name: "Create Folder", icon: "📁", type: "nav" },
             "nav_back": { category: "EFB Tools", name: "Page Back", icon: "⬅️", type: "nav" },
             "nav_home": { category: "EFB Tools", name: "Back to Home", icon: "🏠", type: "nav", targetPage: 0 },
-            
-            // Custom Variables
             "custom_button": { category: "Custom Variables", name: "Custom Button", icon: "🕹️", type: "button", isCustom: true },
             "custom_gauge": { category: "Custom Variables", name: "Custom Gauge", icon: "🛠️", type: "gauge", isCustom: true },
             "smart_toggle": { category: "Custom Variables", name: "Create Smart Toggle", icon: "🔀", type: "smart_toggle", isCustom: true },
@@ -545,46 +442,39 @@
             "radio_nav1_swap": { category: "Radios", name: "NAV 1 Swap", icon: "📡", type: "button", command: "NAV1_RADIO_SWAP" },
             "radio_com2_swap": { category: "Radios", name: "COM 2 Swap", icon: "📻", type: "button", command: "COM2_RADIO_SWAP" },
             "radio_nav2_swap": { category: "Radios", name: "NAV 2 Swap", icon: "📡", type: "button", command: "NAV2_RADIO_SWAP" },
-            "gauge_com1_act": { category: "Radios", name: "COM 1 ACT", icon: "🔊", type: "gauge", dataKey: "com1_act", unit: "", decimals: 3 },
-            "gauge_com1_stby": { category: "Radios", name: "COM 1 STBY", icon: "🔈", type: "gauge", dataKey: "com1_stby", unit: "", decimals: 3 },
-            "gauge_nav1_act": { category: "Radios", name: "NAV 1 ACT", icon: "📍", type: "gauge", dataKey: "nav1_act", unit: "", decimals: 2 },
-            "gauge_nav1_stby": { category: "Radios", name: "NAV 1 STBY", icon: "🗺️", type: "gauge", dataKey: "nav1_stby", unit: "", decimals: 2 },
-            "gauge_com2_act": { category: "Radios", name: "COM 2 ACT", icon: "🔊", type: "gauge", dataKey: "com2_act", unit: "", decimals: 3 },
-            "gauge_com2_stby": { category: "Radios", name: "COM 2 STBY", icon: "🔈", type: "gauge", dataKey: "com2_stby", unit: "", decimals: 3 },
-            "gauge_nav2_act": { category: "Radios", name: "NAV 2 ACT", icon: "📍", type: "gauge", dataKey: "nav2_act", unit: "", decimals: 2 },
-            "gauge_nav2_stby": { category: "Radios", name: "NAV 2 STBY", icon: "🗺️", type: "gauge", dataKey: "nav2_stby", unit: "", decimals: 2 },
             "transponder_ident": { category: "Radios", name: "XPNDR Ident", icon: "🛜", type: "button", command: "XPNDR_IDENT_ON" },
             
-            // Controls
+            // Core Controls
             "parking_brake": { category: "Controls", name: "Parking Brake", icon: "🛑", type: "button", command: "PARKING_BRAKES", stateKey: "parking_brake_state" },
             "gear_toggle": { category: "Controls", name: "Landing Gear", icon: "⚙️", type: "button", command: "GEAR_TOGGLE", stateKey: "gear_state" },
             "flaps_up": { category: "Controls", name: "Flaps Up", icon: "🔼", type: "button", command: "FLAPS_DECR" },
             "flaps_down": { category: "Controls", name: "Flaps Down", icon: "🔽", type: "button", command: "FLAPS_INCR" },
             "spoilers_arm": { category: "Controls", name: "Arm Spoilers", icon: "🛡️", type: "button", command: "SPOILERS_ARM_TOGGLE", stateKey: "spoilers_arm_state" },
             "spoilers_toggle": { category: "Controls", name: "Toggle Spoilers", icon: "🌪️", type: "button", command: "SPOILERS_TOGGLE" },
+            "auto_brake_inc": { category: "Controls", name: "Auto Brake +", icon: "🛞", type: "button", command: "INCREASE_AUTOBRAKE_CONTROL" },
+            "auto_brake_dec": { category: "Controls", name: "Auto Brake -", icon: "🛞", type: "button", command: "DECREASE_AUTOBRAKE_CONTROL" },
             
-            // Systems
-            "avionics_master": { category: "Systems", name: "Avionics", icon: "📻", type: "button", command: "TOGGLE_AVIONICS_MASTER", stateKey: "avionics_state" },
-            "batt_master": { category: "Systems", name: "Battery", icon: "🔋", type: "button", command: "TOGGLE_MASTER_BATTERY", stateKey: "batt_state" },
-            "alt_master": { category: "Systems", name: "Alternator", icon: "⚡", type: "button", command: "TOGGLE_MASTER_ALTERNATOR", stateKey: "alt_state" },
-            "alt_1": { category: "Systems", name: "Alternator 1", icon: "⚡", type: "button", command: "TOGGLE_ALTERNATOR1", stateKey: "alt_1_state" },
-            "pitot_heat": { category: "Systems", name: "Pitot Heat", icon: "🔥", type: "button", command: "PITOT_HEAT_TOGGLE", stateKey: "pitot_state" },
+            // Electrical & APU
+            "batt_master": { category: "Electrical", name: "Battery Master", icon: "🔋", type: "button", command: "TOGGLE_MASTER_BATTERY", stateKey: "batt_state" },
+            "alt_master": { category: "Electrical", name: "Alternator", icon: "⚡", type: "button", command: "TOGGLE_MASTER_ALTERNATOR", stateKey: "alt_state" },
+            "avionics_master": { category: "Electrical", name: "Avionics Master", icon: "📻", type: "button", command: "TOGGLE_AVIONICS_MASTER", stateKey: "avionics_state" },
+            "ext_power": { category: "Electrical", name: "External Power", icon: "🔌", type: "button", command: "TOGGLE_EXTERNAL_POWER" },
+            "apu_start": { category: "Electrical", name: "APU Start", icon: "🔄", type: "button", command: "APU_STARTER" },
+            "apu_off": { category: "Electrical", name: "APU Off", icon: "🛑", type: "button", command: "APU_OFF_SWITCH" },
             
-            // Engines
+            // Engines & Fuel
             "eng1_starter": { category: "Engines", name: "ENG 1 Starter", icon: "🔑", type: "button", command: "TOGGLE_STARTER1", stateKey: "eng1_starter_state" },
             "eng2_starter": { category: "Engines", name: "ENG 2 Starter", icon: "🔑", type: "button", command: "TOGGLE_STARTER2", stateKey: "eng2_starter_state" },
-            "eng1_fuelpump": { category: "Engines", name: "Fuel Pump 1", icon: "⛽", type: "button", command: "TOGGLE_ELECTRICAL_FUEL_PUMP1", stateKey: "eng1_pump_state" },
-            "fuel_pump_gen": { category: "Engines", name: "Aux Fuel Pump", icon: "⛽", type: "button", command: "TOGGLE_ELECTRICAL_FUEL_PUMP", stateKey: "fuel_pump_gen_state" },
-            "carb_heat": { category: "Engines", name: "Carb Heat", icon: "♨️", type: "button", command: "ANTI_ICE_TOGGLE_ENG1", stateKey: "carb_heat_state" },
-            "fuel_sel_l": { category: "Engines", name: "Fuel Left", icon: "◀️", type: "button", command: "FUEL_SELECTOR_LEFT" },
-            "fuel_sel_r": { category: "Engines", name: "Fuel Right", icon: "▶️", type: "button", command: "FUEL_SELECTOR_RIGHT" },
-            "fuel_sel_both": { category: "Engines", name: "Fuel Both", icon: "⏫", type: "button", command: "FUEL_SELECTOR_ALL" },
-            "fuel_sel_off": { category: "Engines", name: "Fuel Off", icon: "🛑", type: "button", command: "FUEL_SELECTOR_OFF" },
-            "mag_off": { category: "Engines", name: "Mag OFF", icon: "⭕", type: "button", command: "MAGNETO1_OFF" },
-            "mag_right": { category: "Engines", name: "Mag RIGHT", icon: "R", type: "button", command: "MAGNETO1_RIGHT" },
-            "mag_left": { category: "Engines", name: "Mag LEFT", icon: "L", type: "button", command: "MAGNETO1_LEFT" },
+            "fuel_pump_gen": { category: "Engines", name: "Fuel Pump", icon: "⛽", type: "button", command: "TOGGLE_ELECTRICAL_FUEL_PUMP", stateKey: "fuel_pump_gen_state" },
+            "fuel_crossfeed": { category: "Engines", name: "Crossfeed", icon: "🔀", type: "button", command: "CROSS_FEED_TOGGLE" },
             "mag_both": { category: "Engines", name: "Mag BOTH", icon: "B", type: "button", command: "MAGNETO1_BOTH" },
             "mag_start": { category: "Engines", name: "Mag START", icon: "🔥", type: "button", command: "MAGNETO1_START" },
+            
+            // De-Ice & Systems
+            "pitot_heat": { category: "Systems", name: "Pitot Heat", icon: "🔥", type: "button", command: "PITOT_HEAT_TOGGLE", stateKey: "pitot_state" },
+            "structural_deice": { category: "Systems", name: "Structural DeIce", icon: "❄️", type: "button", command: "TOGGLE_STRUCTURAL_DEICE" },
+            "prop_deice": { category: "Systems", name: "Prop DeIce", icon: "❄️", type: "button", command: "TOGGLE_PROPELLER_DEICE" },
+            "windshield_deice": { category: "Systems", name: "Windshield DeIce", icon: "❄️", type: "button", command: "WINDSHIELD_DEICE_TOGGLE" },
             
             // Lighting
             "lights_nav": { category: "Lighting", name: "Nav Lights", icon: "🟢", type: "button", command: "TOGGLE_NAV_LIGHTS", stateKey: "nav_light_state" },
@@ -592,26 +482,31 @@
             "lights_strobe": { category: "Lighting", name: "Strobe", icon: "✨", type: "button", command: "STROBES_TOGGLE", stateKey: "strobe_state" },
             "lights_taxi": { category: "Lighting", name: "Taxi Lights", icon: "🚕", type: "button", command: "TOGGLE_TAXI_LIGHTS", stateKey: "taxi_state" },
             "lights_landing": { category: "Lighting", name: "Landing", icon: "🔦", type: "button", command: "LANDING_LIGHTS_TOGGLE", stateKey: "landing_state" },
+            "lights_panel": { category: "Lighting", name: "Panel Lights", icon: "🎛️", type: "button", command: "PANEL_LIGHTS_TOGGLE" },
+            "lights_cabin": { category: "Lighting", name: "Cabin Lights", icon: "💡", type: "button", command: "CABIN_LIGHTS_TOGGLE" },
+            "lights_logo": { category: "Lighting", name: "Logo Lights", icon: "✈️", type: "button", command: "TOGGLE_LOGO_LIGHTS" },
             
-            // Autopilot
+            // Autopilot (Expanded)
             "ap_master": { category: "Autopilot", name: "AP Master", icon: "✈️", type: "button", command: "AP_MASTER", stateKey: "ap_master_state" },
             "ap_fd": { category: "Autopilot", name: "Flight Dir", icon: "📐", type: "button", command: "TOGGLE_FLIGHT_DIRECTOR", stateKey: "fd_state" },
             "ap_athr": { category: "Autopilot", name: "Auto-Throttle", icon: "🚀", type: "button", command: "AUTO_THROTTLE_ARM", stateKey: "ap_athr_state" },
-            "ap_flc": { category: "Autopilot", name: "FLC Mode", icon: "📈", type: "button", command: "FLIGHT_LEVEL_CHANGE", stateKey: "ap_flc_state" },
             "ap_yaw_damper": { category: "Autopilot", name: "Yaw Damper", icon: "⚓", type: "button", command: "YAW_DAMPER_TOGGLE", stateKey: "ap_yd_state" },
             "ap_hdg_hold": { category: "Autopilot", name: "HDG Hold", icon: "🎯", type: "button", command: "AP_PANEL_HEADING_HOLD", stateKey: "ap_hdg_state" },
             "ap_nav_hold": { category: "Autopilot", name: "NAV Hold", icon: "🗺️", type: "button", command: "AP_NAV1_HOLD", stateKey: "ap_nav_state" },
             "ap_alt_hold": { category: "Autopilot", name: "ALT Hold", icon: "⏫", type: "button", command: "AP_PANEL_ALTITUDE_HOLD", stateKey: "ap_alt_state" },
             "ap_vs_hold": { category: "Autopilot", name: "VS Hold", icon: "↕️", type: "button", command: "AP_PANEL_VS_HOLD", stateKey: "ap_vs_state" },
+            "ap_flc": { category: "Autopilot", name: "FLC / SPD", icon: "📈", type: "button", command: "FLIGHT_LEVEL_CHANGE", stateKey: "ap_flc_state" },
             "ap_apr_hold": { category: "Autopilot", name: "Approach", icon: "🛬", type: "button", command: "AP_APR_HOLD", stateKey: "ap_apr_state" },
+            "ap_loc_hold": { category: "Autopilot", name: "Localizer", icon: "📡", type: "button", command: "AP_LOC_HOLD" },
+            "ap_vnav": { category: "Autopilot", name: "VNAV", icon: "📉", type: "button", command: "AP_VNAV_TOGGLE" },
             
-            // Telemetry Gauges
-            "gauge_rpm": { category: "Telemetry", name: "Engine RPM", icon: "⏱️", type: "gauge", dataKey: "rpm", unit: "" },
-            "gauge_flaps": { category: "Telemetry", name: "Flaps %", icon: "📐", type: "gauge", dataKey: "flaps_pct", unit: "%" },
-            "gauge_fuel": { category: "Telemetry", name: "Fuel Qty", icon: "⛽", type: "gauge", dataKey: "fuel_pct", unit: " Gal" },
+            // Telemetry Gauges (Expanded)
             "gauge_alt": { category: "Telemetry", name: "Altitude", icon: "⛰️", type: "gauge", dataKey: "altitude", unit: " FT" },
             "gauge_spd": { category: "Telemetry", name: "Airspeed", icon: "💨", type: "gauge", dataKey: "airspeed", unit: " KTS" },
             "gauge_vs": { category: "Telemetry", name: "Vert Speed", icon: "↕️", type: "gauge", dataKey: "vs", unit: " FPM" },
+            "gauge_rpm": { category: "Telemetry", name: "Engine RPM", icon: "⏱️", type: "gauge", dataKey: "rpm", unit: "" },
+            "gauge_flaps": { category: "Telemetry", name: "Flaps %", icon: "📐", type: "gauge", dataKey: "flaps_pct", unit: "%" },
+            "gauge_fuel": { category: "Telemetry", name: "Fuel Qty", icon: "⛽", type: "gauge", dataKey: "fuel_pct", unit: " Gal" },
             "gauge_oat": { category: "Telemetry", name: "Outside Temp", icon: "🌡️", type: "gauge", dataKey: "oat", unit: "°C" },
             
             // Rotaries
@@ -620,19 +515,8 @@
             "rotary_vs": { category: "Rotaries", name: "AP Vert Spd", icon: "📈", type: "rotary", dataKey: "ap_vs", unit: " FPM", cmdDec: "AP_VS_VAR_DEC", cmdInc: "AP_VS_VAR_INC" },
             "rotary_ap_spd": { category: "Rotaries", name: "AP Speed", icon: "💨", type: "rotary", dataKey: "ap_spd", unit: " KTS", cmdDec: "AP_SPD_VAR_DEC", cmdInc: "AP_SPD_VAR_INC" },
             "rotary_baro": { category: "Rotaries", name: "Barometer", icon: "☁️", type: "rotary", dataKey: "baro", unit: " hPa", cmdDec: "KOHLSMAN_DEC", cmdInc: "KOHLSMAN_INC" },
-            "rotary_obs1": { category: "Rotaries", name: "OBS 1", icon: "🧭", type: "rotary", dataKey: "nav1_obs", unit: "°", cmdDec: "VOR1_OBI_DEC", cmdInc: "VOR1_OBI_INC" },
-            "rotary_obs2": { category: "Rotaries", name: "OBS 2", icon: "🧭", type: "rotary", dataKey: "nav2_obs", unit: "°", cmdDec: "VOR2_OBI_DEC", cmdInc: "VOR2_OBI_INC" },
-            "rotary_com1_whole": { category: "Radios", name: "COM1 Whole", icon: "📻", type: "rotary", dataKey: "com1_stby", unit: "", decimals: 3, cmdDec: "COM_RADIO_WHOLE_DEC", cmdInc: "COM_RADIO_WHOLE_INC" },
-            "rotary_com1_fract": { category: "Radios", name: "COM1 Fract", icon: "📻", type: "rotary", dataKey: "com1_stby", unit: "", decimals: 3, cmdDec: "COM_RADIO_FRACT_DEC", cmdInc: "COM_RADIO_FRACT_INC" },
-            "rotary_nav1_whole": { category: "Radios", name: "NAV1 Whole", icon: "📡", type: "rotary", dataKey: "nav1_stby", unit: "", decimals: 2, cmdDec: "NAV1_RADIO_WHOLE_DEC", cmdInc: "NAV1_RADIO_WHOLE_INC" },
-            "rotary_nav1_fract": { category: "Radios", name: "NAV1 Fract", icon: "📡", type: "rotary", dataKey: "nav1_stby", unit: "", decimals: 2, cmdDec: "NAV1_RADIO_FRACT_DEC", cmdInc: "NAV1_RADIO_FRACT_INC" },
-            "rotary_com2_whole": { category: "Radios", name: "COM2 Whole", icon: "📻", type: "rotary", dataKey: "com2_stby", unit: "", decimals: 3, cmdDec: "COM2_RADIO_WHOLE_DEC", cmdInc: "COM2_RADIO_WHOLE_INC" },
-            "rotary_com2_fract": { category: "Radios", name: "COM2 Fract", icon: "📻", type: "rotary", dataKey: "com2_stby", unit: "", decimals: 3, cmdDec: "COM2_RADIO_FRACT_DEC", cmdInc: "COM2_RADIO_FRACT_INC" },
-            "rotary_nav2_whole": { category: "Radios", name: "NAV2 Whole", icon: "📡", type: "rotary", dataKey: "nav2_stby", unit: "", decimals: 2, cmdDec: "NAV2_RADIO_WHOLE_DEC", cmdInc: "NAV2_RADIO_WHOLE_INC" },
-            "rotary_nav2_fract": { category: "Radios", name: "NAV2 Fract", icon: "📡", type: "rotary", dataKey: "nav2_stby", unit: "", decimals: 2, cmdDec: "NAV2_RADIO_FRACT_DEC", cmdInc: "NAV2_RADIO_FRACT_INC" },
             "rotary_trim_elev": { category: "Controls", name: "Elev Trim", icon: "↕️", type: "rotary", dataKey: "trim_elev", unit: "%", cmdDec: "ELEV_TRIM_UP", cmdInc: "ELEV_TRIM_DN" },
-            "rotary_trim_rudder": { category: "Controls", name: "Rudder Trim", icon: "↔️", type: "rotary", dataKey: "trim_rudder", unit: "%", cmdDec: "RUDDER_TRIM_LEFT", cmdInc: "RUDDER_TRIM_RIGHT" },
-            "rotary_magneto": { category: "Rotaries", name: "Ignition Key", icon: "🔑", type: "rotary", dataKey: "magneto_state", unit: "", cmdDec: "MAGNETO1_DEC", cmdInc: "MAGNETO1_INC" }
+            "rotary_trim_rudder": { category: "Controls", name: "Rudder Trim", icon: "↔️", type: "rotary", dataKey: "trim_rudder", unit: "%", cmdDec: "RUDDER_TRIM_LEFT", cmdInc: "RUDDER_TRIM_RIGHT" }
         };
 
         function getCombinedDictionary() {
@@ -650,16 +534,11 @@
                     };
                 });
             }
-            if (hubhopComponents) {
-                Object.keys(hubhopComponents).forEach(key => {
-                    combined[key] = hubhopComponents[key];
-                });
-            }
             return combined;
         }
 
         // ==========================================
-        // 7. DB INITIALIZATION & SILOS
+        // 6. DB INITIALIZATION & SILOS
         // ==========================================
         function initializeDataSilos() {
             const userDbRef = database.ref('users/' + CURRENT_UID);
@@ -679,7 +558,7 @@
                     if (!isInitializing) {
                         isInitializing = true;
                         globalActiveProfileRef.set(active).catch(e => console.warn("Cloud save rejected. Check Firebase rules."));
-                        profileListRef.child("Default").set(true).catch(e => {});
+                        profileListRef.child("Default").set({ name: "Default" }).catch(e => {});
                     }
                 }
                 if (currentProfile !== active) loadProfile(active);
@@ -687,7 +566,7 @@
 
             profileListRef.on('value', (snap) => {
                 if (snap.val()) {
-                    availableProfiles = Object.keys(snap.val());
+                    availableProfiles = snap.val();
                     renderProfileList();
                 }
             });
@@ -696,12 +575,11 @@
                 myCustomComponents = snap.val() || {};
             });
 
-            fetchVendorList();
             connect();
         }
 
         // ==========================================
-        // 8. PROFILE & SHARING LOGIC
+        // 7. PROFILE & SHARING LOGIC
         // ==========================================
         function loadProfile(profileName) {
             if (layoutListener && currentProfile) {
@@ -744,7 +622,7 @@
 
         function saveLayout() {
             if (currentProfile) {
-                allLayoutsRef.child(currentProfile).set(pagesData).catch(e => console.warn("Layout save rejected by Firebase."));
+                allLayoutsRef.child(currentProfile).set(pagesData).catch(e => console.warn("Layout save rejected."));
             }
         }
 
@@ -755,10 +633,19 @@
             const list = document.getElementById('profile-list');
             list.innerHTML = '';
             
-            availableProfiles.forEach(prof => {
+            Object.keys(availableProfiles).forEach(prof => {
+                const tagData = availableProfiles[prof].aircraftTag ? `<div class="profile-tag">For: ${availableProfiles[prof].aircraftTag}</div>` : '';
                 const item = document.createElement('div');
                 item.className = `profile-item ${prof === currentProfile ? 'active' : ''}`;
-                item.innerHTML = `<span>🛩️ ${prof}</span> ${prof === currentProfile ? '<span>(ACTIVE)</span>' : ''}`;
+                
+                item.innerHTML = `
+                    <div class="profile-title">
+                        <span>🛩️ ${prof}</span> 
+                        ${prof === currentProfile ? '<span>(ACTIVE)</span>' : ''}
+                    </div>
+                    ${tagData}
+                `;
+
                 item.onclick = () => { 
                     globalActiveProfileRef.set(prof).catch(e => {}); 
                     closeProfileModal(); 
@@ -768,10 +655,12 @@
         }
 
         function createNewProfile() {
-            let newName = prompt("Enter a name for the new layout (e.g. Cessna 152):");
+            let newName = prompt("Enter a name for the new layout (e.g. My Custom Dash):");
             if (newName && newName.trim() !== "") {
                 let cleanName = newName.trim();
-                profileListRef.child(cleanName).set(true).catch(e => {});
+                let tag = prompt("Optional: Enter the intended aircraft for this profile (e.g. Cessna 152, PMDG 737):", "Global");
+                
+                profileListRef.child(cleanName).set({ name: cleanName, aircraftTag: tag || "Global" }).catch(e => {});
                 globalActiveProfileRef.set(cleanName).catch(e => {});
                 closeProfileModal();
             }
@@ -781,8 +670,10 @@
             let newName = prompt(`Duplicate "${currentProfile}" as (e.g. ${currentProfile} V2):`);
             if (newName && newName.trim() !== "") {
                 let cleanName = newName.trim();
+                let existingTag = availableProfiles[currentProfile] ? availableProfiles[currentProfile].aircraftTag : "Global";
+
                 allLayoutsRef.child(cleanName).set(pagesData).then(() => {
-                    profileListRef.child(cleanName).set(true);
+                    profileListRef.child(cleanName).set({ name: cleanName, aircraftTag: existingTag });
                     globalActiveProfileRef.set(cleanName);
                     closeProfileModal();
                 }).catch(e => alert("Could not duplicate profile."));
@@ -799,22 +690,102 @@
             
             if (newName && newName.trim() !== "" && newName.trim() !== currentProfile) {
                 let cleanName = newName.trim();
-                
-                if (availableProfiles.includes(cleanName)) {
-                    let overwrite = confirm(`A profile named "${cleanName}" already exists. Overwrite it?`);
-                    if (!overwrite) return;
-                }
-
+                let existingTag = availableProfiles[currentProfile] ? availableProfiles[currentProfile].aircraftTag : "Global";
                 let oldName = currentProfile;
 
                 allLayoutsRef.child(cleanName).set(pagesData).then(() => {
-                    profileListRef.child(cleanName).set(true);
+                    profileListRef.child(cleanName).set({ name: cleanName, aircraftTag: existingTag });
                     profileListRef.child(oldName).remove();
                     globalActiveProfileRef.set(cleanName);
                     allLayoutsRef.child(oldName).remove();
                     closeProfileModal();
                 }).catch(e => alert("Could not rename profile."));
             }
+        }
+
+        function shareProfile() {
+            if (!currentProfile) return;
+            
+            let tag = prompt("Add an Aircraft Tag so others know what plane this is built for (e.g. 'Fenix A320', 'Working Title C208'):", 
+                             availableProfiles[currentProfile] ? availableProfiles[currentProfile].aircraftTag : "General Aviation");
+            
+            if (tag === null) return; // Cancelled
+
+            const shareCode = "SH-" + Math.random().toString(36).substring(2, 8).toUpperCase();
+            
+            // Package the layout AND the tag together
+            const exportPayload = {
+                layoutData: pagesData,
+                aircraftTag: tag.trim() || "Global"
+            };
+
+            sharedProfilesRef.child(shareCode).set(exportPayload).then(() => {
+                prompt("Profile shared successfully! Copy this Share Code to give to your friends or post on Discord:", shareCode);
+            }).catch(e => {
+                alert("Error sharing profile. Ensure Firebase allows writes to efb_shared_profiles.");
+            });
+        }
+
+        function importProfile() {
+            let code = prompt("Enter the Share Code (e.g. SH-A1B2C3):");
+            if (!code) return;
+            code = code.trim().toUpperCase();
+            
+            sharedProfilesRef.child(code).once('value', (snapshot) => {
+                if (snapshot.exists()) {
+                    const importedPayload = snapshot.val();
+                    
+                    // Handle backward compatibility if someone shared an old profile without a tag
+                    const layoutDataToImport = importedPayload.layoutData || importedPayload;
+                    const importedTag = importedPayload.aircraftTag || "Imported Profile";
+
+                    let newName = prompt(`Found a profile for: [${importedTag}]\nWhat would you like to save it as?`, `${importedTag} Setup`);
+                    if (newName && newName.trim() !== "") {
+                        let cleanName = newName.trim();
+                        
+                        // Look for any custom buttons in this imported layout and add them to our library
+                        let newCustoms = {};
+                        for (let p = 0; p < 10; p++) {
+                            if (!layoutDataToImport[p]) continue;
+                            layoutDataToImport[p].forEach(cell => {
+                                if (cell && (cell.customVar || cell.trackingVar)) {
+                                    let exists = Object.values(myCustomComponents).some(
+                                        existing => existing.label === cell.label && existing.baseType === (cell.baseType || cell.id)
+                                    );
+                                    if (!exists) {
+                                        const customId = "imported_custom_" + Math.random().toString(36).substr(2, 9);
+                                        newCustoms[customId] = {
+                                            baseType: cell.baseType || cell.id,
+                                            label: cell.label,
+                                            customVar: cell.customVar || "",
+                                            customUnit: cell.customUnit || "number",
+                                            customCmd: cell.customCmd || "",
+                                            trackingVar: cell.trackingVar || "",
+                                            onCmd: cell.onCmd || "",
+                                            offCmd: cell.offCmd || "",
+                                            customDisplayUnit: cell.customDisplayUnit || ""
+                                        };
+                                        myCustomComponents[customId] = newCustoms[customId];
+                                    }
+                                }
+                            });
+                        }
+
+                        if (Object.keys(newCustoms).length > 0) {
+                            customComponentsRef.update(newCustoms);
+                        }
+
+                        allLayoutsRef.child(cleanName).set(layoutDataToImport).then(() => {
+                            profileListRef.child(cleanName).set({ name: cleanName, aircraftTag: importedTag });
+                            globalActiveProfileRef.set(cleanName);
+                            closeProfileModal();
+                            alert("Profile imported successfully!");
+                        }).catch(e => alert("Could not save imported profile."));
+                    }
+                } else {
+                    alert("Invalid or expired Share Code.");
+                }
+            }).catch(e => alert("Error communicating with the sharing server."));
         }
 
         function changePage(pageIndex, folderName = "") {
@@ -841,7 +812,7 @@
         }
 
         // ==========================================
-        // 9. UI RENDERING & DRAG/DROP
+        // 8. UI RENDERING & DRAG/DROP
         // ==========================================
         function renderGrid() {
             const grid = document.getElementById('builder-grid');
@@ -883,15 +854,11 @@
                     if (!isEditMode) {
                         cell.removeAttribute('draggable');
                         
-                        // NEW SMART TOGGLE LOGIC: Evaluate telemetry before sending command
                         if (cellData.baseType === "smart_toggle" || dictItem.type === "smart_toggle") {
                             cell.onclick = () => {
                                 let liveVal = currentSimState["custom_" + cellData.trackingVar] || 0;
-                                if (liveVal >= 1) {
-                                    sendCommand(cellData.offCmd);
-                                } else {
-                                    sendCommand(cellData.onCmd);
-                                }
+                                if (liveVal >= 1) sendCommand(cellData.offCmd);
+                                else sendCommand(cellData.onCmd);
                             };
                         } else if (cellData.id === "custom_button" || cellData.baseType === "custom_button") {
                             cell.onclick = () => sendCommand(cellData.customCmd);
@@ -1007,12 +974,11 @@
                 if (data.type === 'nav') tagColor = 'var(--accent-purple)';
                 if (data.type === 'smart_toggle') tagColor = 'var(--accent-purple)';
                 if (data.isSavedCustom) tagColor = 'var(--accent-red)'; 
-                if (data.isHubHop) tagColor = 'var(--accent-purple)';
 
                 item.innerHTML = `
                     <span style="font-size: 24px; min-width: 32px; text-align: center;">${data.icon}</span> 
                     <span style="font-size: 16px;">${data.name}</span>
-                    <span class="component-tag" style="color: ${tagColor}">${data.isHubHop ? "AIRCRAFT SPECIFIC" : (data.isSavedCustom ? "SAVED CUSTOM" : data.type.toUpperCase())}</span>
+                    <span class="component-tag" style="color: ${tagColor}">${data.isSavedCustom ? "SAVED CUSTOM" : data.type.toUpperCase()}</span>
                 `;
                 item.onclick = () => assignCell(id);
                 list.appendChild(item);
@@ -1100,7 +1066,6 @@
             let label = ""; let targetPage = "";
 
             if (componentId === "nav_folder") {
-                // ... (Folder logic remains unchanged)
                 let promptedLabel = prompt("Enter Folder Name (e.g. LIGHTING):", "NEW FOLDER");
                 if (!promptedLabel) return; 
                 label = promptedLabel;
@@ -1129,7 +1094,7 @@
                 }
                 pagesData[currentPage][selectedCellIndex] = { id: componentId, label: "Back", targetPage: parentPage };
             
-            } else if (dictItem.isSavedCustom || dictItem.isHubHop) {
+            } else if (dictItem.isSavedCustom) {
                 pagesData[currentPage][selectedCellIndex] = {
                     id: dictItem.baseType || componentId,
                     label: dictItem.label || dictItem.name.substring(0,12).toUpperCase(),
@@ -1208,7 +1173,7 @@
         }
 
         // ==========================================
-        // 10. WEBSOCKET PIPELINE
+        // 9. WEBSOCKET PIPELINE
         // ==========================================
         function broadcastCustomVars() {
             if (!ws || ws.readyState !== WebSocket.OPEN) return;
@@ -1219,12 +1184,10 @@
                 if (!pagesData[p]) continue;
                 pagesData[p].forEach(cell => {
                     if (cell) {
-                        // Track gauge/standard custom vars
                         if (cell.customVar && !seen.has(cell.customVar)) {
                             seen.add(cell.customVar);
                             varsToTrack.push({ name: cell.customVar, unit: cell.customUnit || "number" });
                         }
-                        // Track SMART TOGGLE state vars
                         if (cell.trackingVar && !seen.has(cell.trackingVar)) {
                             seen.add(cell.trackingVar);
                             varsToTrack.push({ name: cell.trackingVar, unit: "number" });
@@ -1262,7 +1225,6 @@
                 try {
                     const data = JSON.parse(event.data);
                     
-                    // Update global state tracker for Smart Toggles
                     Object.assign(currentSimState, data);
 
                     if (!isEditMode) {
@@ -1287,11 +1249,10 @@
                                     }
                                 }
                                 
-                                // Visual state for standard buttons AND Smart Toggles
                                 if (dictItem && (dictItem.type === 'button' || dictItem.type === 'smart_toggle')) {
                                     let stateKey = dictItem.stateKey;
                                     if (cellData.customVar) stateKey = "custom_" + cellData.customVar;
-                                    if (cellData.trackingVar) stateKey = "custom_" + cellData.trackingVar; // Smart Toggle state
+                                    if (cellData.trackingVar) stateKey = "custom_" + cellData.trackingVar; 
                                     
                                     if (stateKey && currentSimState[stateKey] !== undefined) {
                                         const stateValue = currentSimState[stateKey];
