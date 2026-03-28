@@ -426,7 +426,7 @@
 
 
         // ==========================================
-        // 5. THE EXPANDED MEGA DICTIONARY
+        // 5. THE ULTIMATE MEGA DICTIONARY
         // ==========================================
         const DICTIONARY = {
             // EFB Tools & Custom
@@ -437,12 +437,20 @@
             "custom_gauge": { category: "Custom Variables", name: "Custom Gauge", icon: "🛠️", type: "gauge", isCustom: true },
             "smart_toggle": { category: "Custom Variables", name: "Create Smart Toggle", icon: "🔀", type: "smart_toggle", isCustom: true },
             
-            // Radios
+            // Radios (RESTORED)
             "radio_com1_swap": { category: "Radios", name: "COM 1 Swap", icon: "📻", type: "button", command: "COM_STBY_RADIO_SWAP" },
             "radio_nav1_swap": { category: "Radios", name: "NAV 1 Swap", icon: "📡", type: "button", command: "NAV1_RADIO_SWAP" },
             "radio_com2_swap": { category: "Radios", name: "COM 2 Swap", icon: "📻", type: "button", command: "COM2_RADIO_SWAP" },
             "radio_nav2_swap": { category: "Radios", name: "NAV 2 Swap", icon: "📡", type: "button", command: "NAV2_RADIO_SWAP" },
             "transponder_ident": { category: "Radios", name: "XPNDR Ident", icon: "🛜", type: "button", command: "XPNDR_IDENT_ON" },
+            "gauge_com1_act": { category: "Radios", name: "COM 1 ACT", icon: "🔊", type: "gauge", dataKey: "com1_act", unit: "", decimals: 3 },
+            "gauge_com1_stby": { category: "Radios", name: "COM 1 STBY", icon: "🔈", type: "gauge", dataKey: "com1_stby", unit: "", decimals: 3 },
+            "gauge_nav1_act": { category: "Radios", name: "NAV 1 ACT", icon: "📍", type: "gauge", dataKey: "nav1_act", unit: "", decimals: 2 },
+            "gauge_nav1_stby": { category: "Radios", name: "NAV 1 STBY", icon: "🗺️", type: "gauge", dataKey: "nav1_stby", unit: "", decimals: 2 },
+            "gauge_com2_act": { category: "Radios", name: "COM 2 ACT", icon: "🔊", type: "gauge", dataKey: "com2_act", unit: "", decimals: 3 },
+            "gauge_com2_stby": { category: "Radios", name: "COM 2 STBY", icon: "🔈", type: "gauge", dataKey: "com2_stby", unit: "", decimals: 3 },
+            "gauge_nav2_act": { category: "Radios", name: "NAV 2 ACT", icon: "📍", type: "gauge", dataKey: "nav2_act", unit: "", decimals: 2 },
+            "gauge_nav2_stby": { category: "Radios", name: "NAV 2 STBY", icon: "🗺️", type: "gauge", dataKey: "nav2_stby", unit: "", decimals: 2 },
             
             // Core Controls
             "parking_brake": { category: "Controls", name: "Parking Brake", icon: "🛑", type: "button", command: "PARKING_BRAKES", stateKey: "parking_brake_state" },
@@ -462,11 +470,18 @@
             "apu_start": { category: "Electrical", name: "APU Start", icon: "🔄", type: "button", command: "APU_STARTER" },
             "apu_off": { category: "Electrical", name: "APU Off", icon: "🛑", type: "button", command: "APU_OFF_SWITCH" },
             
-            // Engines & Fuel
+            // Engines & Fuel (RESTORED ORIGINALS)
             "eng1_starter": { category: "Engines", name: "ENG 1 Starter", icon: "🔑", type: "button", command: "TOGGLE_STARTER1", stateKey: "eng1_starter_state" },
             "eng2_starter": { category: "Engines", name: "ENG 2 Starter", icon: "🔑", type: "button", command: "TOGGLE_STARTER2", stateKey: "eng2_starter_state" },
             "fuel_pump_gen": { category: "Engines", name: "Fuel Pump", icon: "⛽", type: "button", command: "TOGGLE_ELECTRICAL_FUEL_PUMP", stateKey: "fuel_pump_gen_state" },
             "fuel_crossfeed": { category: "Engines", name: "Crossfeed", icon: "🔀", type: "button", command: "CROSS_FEED_TOGGLE" },
+            "fuel_sel_l": { category: "Engines", name: "Fuel Left", icon: "◀️", type: "button", command: "FUEL_SELECTOR_LEFT" },
+            "fuel_sel_r": { category: "Engines", name: "Fuel Right", icon: "▶️", type: "button", command: "FUEL_SELECTOR_RIGHT" },
+            "fuel_sel_both": { category: "Engines", name: "Fuel Both", icon: "⏫", type: "button", command: "FUEL_SELECTOR_ALL" },
+            "fuel_sel_off": { category: "Engines", name: "Fuel Off", icon: "🛑", type: "button", command: "FUEL_SELECTOR_OFF" },
+            "mag_off": { category: "Engines", name: "Mag OFF", icon: "⭕", type: "button", command: "MAGNETO1_OFF" },
+            "mag_right": { category: "Engines", name: "Mag RIGHT", icon: "R", type: "button", command: "MAGNETO1_RIGHT" },
+            "mag_left": { category: "Engines", name: "Mag LEFT", icon: "L", type: "button", command: "MAGNETO1_LEFT" },
             "mag_both": { category: "Engines", name: "Mag BOTH", icon: "B", type: "button", command: "MAGNETO1_BOTH" },
             "mag_start": { category: "Engines", name: "Mag START", icon: "🔥", type: "button", command: "MAGNETO1_START" },
             
@@ -475,6 +490,7 @@
             "structural_deice": { category: "Systems", name: "Structural DeIce", icon: "❄️", type: "button", command: "TOGGLE_STRUCTURAL_DEICE" },
             "prop_deice": { category: "Systems", name: "Prop DeIce", icon: "❄️", type: "button", command: "TOGGLE_PROPELLER_DEICE" },
             "windshield_deice": { category: "Systems", name: "Windshield DeIce", icon: "❄️", type: "button", command: "WINDSHIELD_DEICE_TOGGLE" },
+            "carb_heat": { category: "Systems", name: "Carb Heat", icon: "♨️", type: "button", command: "ANTI_ICE_TOGGLE_ENG1", stateKey: "carb_heat_state" },
             
             // Lighting
             "lights_nav": { category: "Lighting", name: "Nav Lights", icon: "🟢", type: "button", command: "TOGGLE_NAV_LIGHTS", stateKey: "nav_light_state" },
@@ -486,7 +502,7 @@
             "lights_cabin": { category: "Lighting", name: "Cabin Lights", icon: "💡", type: "button", command: "CABIN_LIGHTS_TOGGLE" },
             "lights_logo": { category: "Lighting", name: "Logo Lights", icon: "✈️", type: "button", command: "TOGGLE_LOGO_LIGHTS" },
             
-            // Autopilot (Expanded)
+            // Autopilot
             "ap_master": { category: "Autopilot", name: "AP Master", icon: "✈️", type: "button", command: "AP_MASTER", stateKey: "ap_master_state" },
             "ap_fd": { category: "Autopilot", name: "Flight Dir", icon: "📐", type: "button", command: "TOGGLE_FLIGHT_DIRECTOR", stateKey: "fd_state" },
             "ap_athr": { category: "Autopilot", name: "Auto-Throttle", icon: "🚀", type: "button", command: "AUTO_THROTTLE_ARM", stateKey: "ap_athr_state" },
@@ -500,7 +516,7 @@
             "ap_loc_hold": { category: "Autopilot", name: "Localizer", icon: "📡", type: "button", command: "AP_LOC_HOLD" },
             "ap_vnav": { category: "Autopilot", name: "VNAV", icon: "📉", type: "button", command: "AP_VNAV_TOGGLE" },
             
-            // Telemetry Gauges (Expanded)
+            // Telemetry Gauges
             "gauge_alt": { category: "Telemetry", name: "Altitude", icon: "⛰️", type: "gauge", dataKey: "altitude", unit: " FT" },
             "gauge_spd": { category: "Telemetry", name: "Airspeed", icon: "💨", type: "gauge", dataKey: "airspeed", unit: " KTS" },
             "gauge_vs": { category: "Telemetry", name: "Vert Speed", icon: "↕️", type: "gauge", dataKey: "vs", unit: " FPM" },
@@ -509,14 +525,25 @@
             "gauge_fuel": { category: "Telemetry", name: "Fuel Qty", icon: "⛽", type: "gauge", dataKey: "fuel_pct", unit: " Gal" },
             "gauge_oat": { category: "Telemetry", name: "Outside Temp", icon: "🌡️", type: "gauge", dataKey: "oat", unit: "°C" },
             
-            // Rotaries
+            // Rotaries (RESTORED RADIO DIALS)
             "rotary_hdg": { category: "Rotaries", name: "AP Heading", icon: "🧭", type: "rotary", dataKey: "ap_hdg", unit: "°", cmdDec: "HEADING_BUG_DEC", cmdInc: "HEADING_BUG_INC" },
             "rotary_alt": { category: "Rotaries", name: "AP Altitude", icon: "↕️", type: "rotary", dataKey: "ap_alt", unit: " FT", cmdDec: "AP_ALT_VAR_DEC", cmdInc: "AP_ALT_VAR_INC" },
             "rotary_vs": { category: "Rotaries", name: "AP Vert Spd", icon: "📈", type: "rotary", dataKey: "ap_vs", unit: " FPM", cmdDec: "AP_VS_VAR_DEC", cmdInc: "AP_VS_VAR_INC" },
             "rotary_ap_spd": { category: "Rotaries", name: "AP Speed", icon: "💨", type: "rotary", dataKey: "ap_spd", unit: " KTS", cmdDec: "AP_SPD_VAR_DEC", cmdInc: "AP_SPD_VAR_INC" },
             "rotary_baro": { category: "Rotaries", name: "Barometer", icon: "☁️", type: "rotary", dataKey: "baro", unit: " hPa", cmdDec: "KOHLSMAN_DEC", cmdInc: "KOHLSMAN_INC" },
             "rotary_trim_elev": { category: "Controls", name: "Elev Trim", icon: "↕️", type: "rotary", dataKey: "trim_elev", unit: "%", cmdDec: "ELEV_TRIM_UP", cmdInc: "ELEV_TRIM_DN" },
-            "rotary_trim_rudder": { category: "Controls", name: "Rudder Trim", icon: "↔️", type: "rotary", dataKey: "trim_rudder", unit: "%", cmdDec: "RUDDER_TRIM_LEFT", cmdInc: "RUDDER_TRIM_RIGHT" }
+            "rotary_trim_rudder": { category: "Controls", name: "Rudder Trim", icon: "↔️", type: "rotary", dataKey: "trim_rudder", unit: "%", cmdDec: "RUDDER_TRIM_LEFT", cmdInc: "RUDDER_TRIM_RIGHT" },
+            "rotary_obs1": { category: "Rotaries", name: "OBS 1", icon: "🧭", type: "rotary", dataKey: "nav1_obs", unit: "°", cmdDec: "VOR1_OBI_DEC", cmdInc: "VOR1_OBI_INC" },
+            "rotary_obs2": { category: "Rotaries", name: "OBS 2", icon: "🧭", type: "rotary", dataKey: "nav2_obs", unit: "°", cmdDec: "VOR2_OBI_DEC", cmdInc: "VOR2_OBI_INC" },
+            "rotary_com1_whole": { category: "Radios", name: "COM1 Whole", icon: "📻", type: "rotary", dataKey: "com1_stby", unit: "", decimals: 3, cmdDec: "COM_RADIO_WHOLE_DEC", cmdInc: "COM_RADIO_WHOLE_INC" },
+            "rotary_com1_fract": { category: "Radios", name: "COM1 Fract", icon: "📻", type: "rotary", dataKey: "com1_stby", unit: "", decimals: 3, cmdDec: "COM_RADIO_FRACT_DEC", cmdInc: "COM_RADIO_FRACT_INC" },
+            "rotary_nav1_whole": { category: "Radios", name: "NAV1 Whole", icon: "📡", type: "rotary", dataKey: "nav1_stby", unit: "", decimals: 2, cmdDec: "NAV1_RADIO_WHOLE_DEC", cmdInc: "NAV1_RADIO_WHOLE_INC" },
+            "rotary_nav1_fract": { category: "Radios", name: "NAV1 Fract", icon: "📡", type: "rotary", dataKey: "nav1_stby", unit: "", decimals: 2, cmdDec: "NAV1_RADIO_FRACT_DEC", cmdInc: "NAV1_RADIO_FRACT_INC" },
+            "rotary_com2_whole": { category: "Radios", name: "COM2 Whole", icon: "📻", type: "rotary", dataKey: "com2_stby", unit: "", decimals: 3, cmdDec: "COM2_RADIO_WHOLE_DEC", cmdInc: "COM2_RADIO_WHOLE_INC" },
+            "rotary_com2_fract": { category: "Radios", name: "COM2 Fract", icon: "📻", type: "rotary", dataKey: "com2_stby", unit: "", decimals: 3, cmdDec: "COM2_RADIO_FRACT_DEC", cmdInc: "COM2_RADIO_FRACT_INC" },
+            "rotary_nav2_whole": { category: "Radios", name: "NAV2 Whole", icon: "📡", type: "rotary", dataKey: "nav2_stby", unit: "", decimals: 2, cmdDec: "NAV2_RADIO_WHOLE_DEC", cmdInc: "NAV2_RADIO_WHOLE_INC" },
+            "rotary_nav2_fract": { category: "Radios", name: "NAV2 Fract", icon: "📡", type: "rotary", dataKey: "nav2_stby", unit: "", decimals: 2, cmdDec: "NAV2_RADIO_FRACT_DEC", cmdInc: "NAV2_RADIO_FRACT_INC" },
+            "rotary_magneto": { category: "Rotaries", name: "Ignition Key", icon: "🔑", type: "rotary", dataKey: "magneto_state", unit: "", cmdDec: "MAGNETO1_DEC", cmdInc: "MAGNETO1_INC" }
         };
 
         function getCombinedDictionary() {
