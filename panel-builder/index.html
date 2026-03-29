@@ -611,6 +611,28 @@
             "gauge_fuel": { category: "Telemetry", name: "Fuel Qty", icon: "⛽", type: "gauge", dataKey: "fuel_pct", unit: " Gal" },
             "gauge_oat": { category: "Telemetry", name: "Outside Temp", icon: "🌡️", type: "gauge", dataKey: "oat", unit: "°C" },
             
+// Fuel System (Translated from XML)
+            "fuel_pump_manual": { category: "Engines", name: "Manual Pump", icon: "⛽", type: "button", command: "MANUAL_FUEL_PRESSURE_PUMP" },
+            "fuel_transfer": { category: "Engines", name: "Fuel Transfer", icon: "🔄", type: "button", command: "MANUAL_FUEL_TRANSFER" },
+            "fuel_dump": { category: "Engines", name: "Dump Fuel", icon: "🚰", type: "button", command: "FUEL_DUMP_TOGGLE" },
+
+            // Flight Controls & Trims (Translated from XML)
+            "trim_aileron_l": { category: "Controls", name: "Ail Trim L", icon: "⬅️", type: "button", command: "AILERON_TRIM_LEFT" },
+            "trim_aileron_r": { category: "Controls", name: "Ail Trim R", icon: "➡️", type: "button", command: "AILERON_TRIM_RIGHT" },
+            "trim_rudder_l": { category: "Controls", name: "Rud Trim L", icon: "↩️", type: "button", command: "RUDDER_TRIM_LEFT" },
+            "trim_rudder_r": { category: "Controls", name: "Rud Trim R", icon: "↪️", type: "button", command: "RUDDER_TRIM_RIGHT" },
+            "trim_rudder_reset": { category: "Controls", name: "Rud Trim Rst", icon: "🔃", type: "button", command: "RUDDER_TRIM_RESET" },
+
+            // Warnings & Systems (Translated from XML)
+            "master_warning_ack": { category: "Systems", name: "Ack Warning", icon: "⚠️", type: "button", command: "MASTER_WARNING_ACKNOWLEDGE" },
+            "master_caution_ack": { category: "Systems", name: "Ack Caution", icon: "🟨", type: "button", command: "MASTER_CAUTION_ACKNOWLEDGE" },
+            "elt_toggle": { category: "Systems", name: "ELT Beacon", icon: "📡", type: "button", command: "ELT_TOGGLE" },
+
+            // Glider & Seaplane (Translated from XML)
+            "tow_release": { category: "Glider", name: "Release Tow", icon: "🪁", type: "button", command: "TOW_PLANE_RELEASE" },
+            "water_ballast": { category: "Glider", name: "Water Ballast", icon: "💧", type: "button", command: "TOGGLE_WATER_BALLAST_VALVE" },
+            "water_rudder": { category: "Controls", name: "Water Rudder", icon: "🛶", type: "button", command: "TOGGLE_WATER_RUDDER" },
+
             // Rotaries
             "rotary_hdg": { category: "Rotaries", name: "AP Heading", icon: "🧭", type: "rotary", dataKey: "ap_hdg", unit: "°", cmdDec: "HEADING_BUG_DEC", cmdInc: "HEADING_BUG_INC" },
             "rotary_alt": { category: "Rotaries", name: "AP Altitude", icon: "↕️", type: "rotary", dataKey: "ap_alt", unit: " FT", cmdDec: "AP_ALT_VAR_DEC", cmdInc: "AP_ALT_VAR_INC" },
