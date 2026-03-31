@@ -23,7 +23,7 @@ export default function ProfileModal({
                             onClick={() => onSelectProfile(profName)}
                         >
                             <div className="profile-title">
-                                <span>🛩️ {profName}</span>
+                                <span><span className="retro-hide">🛩️ </span>{profName}</span>
                                 {profName === currentProfile && <span style={{ fontSize: '10px', background: '#000', padding: '4px 8px', borderRadius: '4px', color: 'inherit' }}>ACTIVE</span>}
                             </div>
                             <div className="profile-tag">
@@ -34,12 +34,12 @@ export default function ProfileModal({
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '16px', borderTop: '1px solid #27272a', paddingTop: '16px' }}>
-                    <button onClick={onCreateNew} className="btn-action btn-outline">➕ New</button>
-                    <button onClick={onImport} className="btn-action btn-outline">📥 Import</button>
-                    <button onClick={onDuplicate} className="btn-action btn-outline">📄 Clone</button>
-                    <button onClick={onShare} className="btn-action btn-outline">📤 Share</button>
-                    <button onClick={onRename} className="btn-action btn-outline">✏️ Rename</button>
-                    <button onClick={onDelete} className="btn-action btn-outline" style={{color: 'var(--accent-red)', borderColor: 'var(--border-panel)'}}>🗑️ Delete</button>
+                    <button onClick={onCreateNew} className="btn-action btn-outline"><span className="retro-hide">➕ </span>New</button>
+                    <button onClick={onImport} className="btn-action btn-outline"><span className="retro-hide">📥 </span>Import</button>
+                    <button onClick={onDuplicate} className="btn-action btn-outline"><span className="retro-hide">📄 </span>Clone</button>
+                    <button onClick={onShare} className="btn-action btn-outline"><span className="retro-hide">📤 </span>Share</button>
+                    <button onClick={onRename} className="btn-action btn-outline"><span className="retro-hide">✏️ </span>Rename</button>
+                    <button onClick={onDelete} className="btn-action btn-outline" style={{color: 'var(--accent-red)', borderColor: 'var(--border-panel)'}}><span className="retro-hide">🗑️ </span>Delete</button>
                 </div>
                 
                 <button onClick={onClose} className="cancel-btn" style={{ marginTop: '16px' }}>Close</button>

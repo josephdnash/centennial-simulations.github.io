@@ -19,6 +19,7 @@ export default function Cell({ index, cellData, isEditMode, onClick, onDelete, o
         }
     };
 
+    // 1. Render empty slots
     if (!cellData || !cellData.id) {
         return (
             <div 
@@ -33,7 +34,37 @@ export default function Cell({ index, cellData, isEditMode, onClick, onDelete, o
     }
 
     const dictItem = DICTIONARY[cellData.baseType || cellData.id];
-    if (!dictItem) return null;
+    
+    // 2. Render "Ghost" slots (Prevents the CSS grid from shifting!)
+    if (!dictItem) {
+        return (
+            <div 
+                className="grid-cell filled" 
+                onDragOver={handleDragOver}
+                onDrop={handleDrop}
+                style={{ border: '2px dashed var(--accent-red)', justifyContent: 'center' }}
+            >
+                {isEditMode && (
+                    <button 
+                        className="delete-cell-btn"
+                        onClick={(e) => { 
+                            e.stopPropagation(); 
+                            onDelete(index); 
+                        }}
+                    >
+                        ✕
+                    </button>
+                )}
+
+                {isEditMode && (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <span style={{ color: 'var(--accent-red)', fontSize: '16px', marginBottom: '4px' }}>⚠️</span>
+                        <span style={{ color: 'var(--accent-red)', fontSize: '10px', fontWeight: 'bold', textAlign: 'center' }}>GHOST<br/>CELL</span>
+                    </div>
+                )}
+            </div>
+        );
+    }
 
     const displayName = cellData.label || dictItem.name;
     const isGauge = dictItem.type === 'gauge';
@@ -69,7 +100,7 @@ export default function Cell({ index, cellData, isEditMode, onClick, onDelete, o
             return;
         }
         
-        e.stopPropagation();
+        if (e && e.stopPropagation) e.stopPropagation();
 
         // --- NAVIGATION INTERCEPTORS ---
         
@@ -90,7 +121,6 @@ export default function Cell({ index, cellData, isEditMode, onClick, onDelete, o
         }
 
         if (isBack) {
-            // Read the dynamically assigned target page, fallback to 0 if lost
             onNavigate(cellData.targetPage !== undefined ? cellData.targetPage : 0);
             return;
         }

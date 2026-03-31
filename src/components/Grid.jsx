@@ -1,6 +1,6 @@
 import Cell from './Cell';
 
-export default function Grid({ pageData, isEditMode, onCellClick, onDeleteCell, onDropCell, onNavigate, simState, sendCommand }) {
+export default function Grid({ pageData, isEditMode, onCellClick, onDeleteCell, onDropCell, onNavigate, simState, sendCommand, theme }) {
     return (
         <div className="builder-grid">
             {pageData.map((cellData, index) => (
@@ -12,9 +12,10 @@ export default function Grid({ pageData, isEditMode, onCellClick, onDeleteCell, 
                     onClick={onCellClick}
                     onDelete={onDeleteCell}
                     onDropCell={onDropCell}
-                    onNavigate={onNavigate} /* PASS NAVIGATION TO CELLS */
+                    onNavigate={onNavigate}
                     simState={simState}
                     sendCommand={sendCommand}
+                    theme={theme} /* NEW: Pass the theme down */
                 />
             ))}
         </div>

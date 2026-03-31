@@ -52,12 +52,14 @@ export default function TopBar({
             </div>
             
             <div className="controls-row">
-                <button className="mode-toggle profile-btn" onClick={openSettings}>⚙️ SETTINGS</button>
+                <button className="mode-toggle profile-btn" onClick={openSettings}>
+                    <span className="retro-hide">⚙️ </span>SETTINGS
+                </button>
                 <button className="mode-toggle profile-btn" onClick={openProfiles}>
-                    🛩️ <span style={{ textTransform: 'uppercase' }}>{currentProfile}</span>
+                    <span className="retro-hide">🛩️ </span><span style={{ textTransform: 'uppercase' }}>{currentProfile}</span>
                 </button>
                 <button className={`mode-toggle ${isEditMode ? 'fly-btn' : 'edit-btn'}`} onClick={toggleMode}>
-                    {isEditMode ? "🚀 GO TO FLY MODE" : "✏️ GO TO EDIT MODE"}
+                    {isEditMode ? <><span className="retro-hide">🚀 </span>GO TO FLY MODE</> : <><span className="retro-hide">✏️ </span>GO TO EDIT MODE</>}
                 </button>
             </div>
             <style>{`@keyframes pulse { 0% { opacity: 0.3; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1.2); } 100% { opacity: 0.3; transform: scale(0.8); } }`}</style>

@@ -11,37 +11,83 @@ import ComponentModal from './components/ComponentModal';
 import SettingsModal from './components/SettingsModal';
 import CellSettingsModal from './components/CellSettingsModal';
 import ProfileModal from './components/ProfileModal';
-import AdminDashboard from './components/AdminDashboard'; // <-- NEW IMPORT
+import AdminDashboard from './components/AdminDashboard';
 
 import useMSFS from './hooks/useMSFS';
 
 function App() {
+    // --- AUTH STATES ---
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [isAdmin, setIsAdmin] = useState(false);
     
+    // --- APP & PAIRING STATES ---
     const [userPin, setUserPin] = useState(localStorage.getItem("efb_pairing_pin") || null);
     const [isPairing, setIsPairing] = useState(false);
     const [isEditMode, setIsEditMode] = useState(true);
     
+    // --- PERSISTENT ROUTING STATES ---
     const [currentProfile, setCurrentProfile] = useState(localStorage.getItem("efb_current_profile") || "Default");
     const [currentPage, setCurrentPage] = useState(parseInt(localStorage.getItem("efb_current_page")) || 0);
 
+    // --- UI THEME STATE ---
+    let initialTheme = localStorage.getItem('efb_theme') || 'modern';
+    if (initialTheme === 'retro' || initialTheme === '3d-experimental') initialTheme = 'retro-green';
+    const [theme, setTheme] = useState(initialTheme);
+
+    // --- MODAL STATES ---
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isCellSettingsOpen, setIsCellSettingsOpen] = useState(false);
     const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
-    const [showAdmin, setShowAdmin] = useState(false); // <-- NEW STATE
+    const [showAdmin, setShowAdmin] = useState(false);
     const [selectedCellIndex, setSelectedCellIndex] = useState(null);
 
+    // --- DATA STATES ---
     const [availableProfiles, setAvailableProfiles] = useState({});
     const [customComponents, setCustomComponents] = useState({});
     const [pagesData, setPagesData] = useState(
         new Array(10).fill(null).map(() => new Array(24).fill(""))
     );
 
+    // --- WEBSOCKET ENGINE ---
     const { simState, connectionStatus, sendCommand } = useMSFS(userPin, pagesData);
 
+    // --- THEME SIDE EFFECT ---
+    useEffect(() => {
+        localStorage.setItem('efb_theme', theme);
+        
+        document.body.classList.remove('theme-retro', 'theme-retro-green', 'theme-retro-blue');
+        
+        if (theme === 'retro-green') {
+            document.body.classList.add('theme-retro', 'theme-retro-green');
+        } else if (theme === 'retro-blue') {
+            document.body.classList.add('theme-retro', 'theme-retro-blue');
+        }
+    }, [theme]);
+
+    const themes = ['modern', 'retro-green', 'retro-blue'];
+    const cycleTheme = (direction) => {
+        setTheme(prev => {
+            let currentIndex = themes.indexOf(prev);
+            if (currentIndex === -1) currentIndex = 0;
+            if (direction === 'next') return themes[(currentIndex + 1) % themes.length];
+            return themes[(currentIndex - 1 + themes.length) % themes.length];
+        });
+    };
+
+    // --- MODE SIDE EFFECT (SAFE CLASS TOGGLE) ---
+    useEffect(() => {
+        if (isEditMode) {
+            document.body.classList.add('edit-mode');
+            document.body.classList.remove('fly-mode');
+        } else {
+            document.body.classList.add('fly-mode');
+            document.body.classList.remove('edit-mode');
+        }
+    }, [isEditMode]);
+
+    // Watch for a successful pairing connection
     useEffect(() => {
         if (isPairing && connectionStatus === 'connected') {
             localStorage.setItem("efb_pairing_pin", userPin);
@@ -49,11 +95,13 @@ function App() {
         }
     }, [isPairing, connectionStatus, userPin]);
 
+    // Persist Profile and Page across refreshes
     useEffect(() => {
         localStorage.setItem("efb_current_profile", currentProfile);
         localStorage.setItem("efb_current_page", currentPage.toString());
     }, [currentProfile, currentPage]);
 
+    // --- 1. FIREBASE AUTHENTICATION ---
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             if (currentUser) {
@@ -70,6 +118,7 @@ function App() {
         return () => unsubscribe();
     }, []);
 
+    // --- 2. FIREBASE PROFILE METADATA SYNC ---
     useEffect(() => {
         if (!user) return;
         const profilesRef = ref(database, `users/${user.uid}/profiles`);
@@ -85,6 +134,7 @@ function App() {
         return () => unsubscribe();
     }, [user]);
 
+    // --- 3. FIREBASE LAYOUT DATA SYNC ---
     useEffect(() => {
         if (!user || !currentProfile) return;
         const layoutRef = ref(database, `users/${user.uid}/layouts/${currentProfile}`);
@@ -106,6 +156,7 @@ function App() {
         return () => unsubscribe();
     }, [user, currentProfile]);
 
+    // --- 4. FIREBASE CUSTOM COMPONENT SYNC ---
     useEffect(() => {
         if (!user) return;
         const customRef = ref(database, `users/${user.uid}/customComponents`);
@@ -122,6 +173,7 @@ function App() {
         }
     };
 
+    // --- GRID INTERACTION HANDLERS ---
     const handleCellClick = (index) => {
         if (isEditMode) {
             setSelectedCellIndex(index);
@@ -259,8 +311,17 @@ function App() {
 
     const handleDeleteFromLibrary = async (customId) => {
         if (!user) return;
-        if (window.confirm("Delete this custom component from your library?")) {
+        if (window.confirm("Delete this custom component from your library? This will also remove it from your active layout.")) {
+            // 1. Delete from Firebase Custom Library
             await set(ref(database, `users/${user.uid}/customComponents/${customId}`), null);
+            
+            // 2. Cascade Delete: Scrub the active layout of any ghost cells
+            const newPagesData = pagesData.map(page => 
+                page.map(cell => (cell && cell.id === customId) ? "" : cell)
+            );
+            
+            setPagesData(newPagesData);
+            saveLayoutToCloud(newPagesData);
         }
     };
 
@@ -378,6 +439,7 @@ function App() {
         }
     };
 
+    // --- RENDER PREP ---
     let breadcrumbText = "HOME";
     if (currentPage > 0) {
         for (let p = 0; p < 10; p++) {
@@ -407,8 +469,6 @@ function App() {
         );
     }
 
-    document.body.className = isEditMode ? 'edit-mode' : 'fly-mode';
-
     return (
         <div className="app-container">
             <TopBar 
@@ -431,7 +491,8 @@ function App() {
                 onDropCell={handleDropCell}
                 onNavigate={(page) => setCurrentPage(page)}
                 simState={simState}           
-                sendCommand={sendCommand}     
+                sendCommand={sendCommand}
+                theme={theme}
             />
 
             <ComponentModal 
@@ -474,7 +535,9 @@ function App() {
                 onOpenAdmin={() => { 
                     setIsSettingsOpen(false); 
                     setShowAdmin(true); 
-                }} 
+                }}
+                theme={theme}
+                cycleTheme={cycleTheme}
             />
         </div>
     );

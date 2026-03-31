@@ -170,3 +170,150 @@ body {
 
 .unpair-btn { background: transparent; color: var(--accent-red); border: 1px solid var(--accent-red); padding: 14px; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.2s; margin-top: 16px; width: 100%;}
 .unpair-btn:hover { background: rgba(239, 68, 68, 0.1); }
+
+/* ==========================================
+   RETRO CRT TERMINAL THEMES
+   ========================================== */
+
+/* 1. Base Terminal Palette - GREEN */
+body.theme-retro-green {
+    --bg-base: #050505;
+    --bg-panel: #0a0f0a;
+    --border-panel: #1a4d1a;
+    --text-main: #4af626;
+    --text-muted: #2c9b17;
+    --accent-blue: #4af626;
+    --accent-green: #4af626;
+    --accent-red: #4af626;
+    --accent-yellow: #4af626;
+    --accent-purple: #4af626;
+    --phosphor-glow: rgba(74, 246, 38, 0.6);
+    --phosphor-glow-dim: rgba(74, 246, 38, 0.4);
+    --active-bg: rgba(74, 246, 38, 0.1);
+}
+
+/* 2. Base Terminal Palette - BLUE */
+body.theme-retro-blue {
+    --bg-base: #02060d;
+    --bg-panel: #040c1a;
+    --border-panel: #143b66;
+    --text-main: #4dc3ff;
+    --text-muted: #2073a8;
+    --accent-blue: #4dc3ff;
+    --accent-green: #4dc3ff;
+    --accent-red: #4dc3ff;
+    --accent-yellow: #4dc3ff;
+    --accent-purple: #4dc3ff;
+    --phosphor-glow: rgba(77, 195, 255, 0.6);
+    --phosphor-glow-dim: rgba(77, 195, 255, 0.4);
+    --active-bg: rgba(77, 195, 255, 0.1);
+}
+
+/* 3. The Typography & Core Layout (Shared by all Retro themes) */
+body.theme-retro {
+    font-family: 'Roboto Mono', 'Courier New', Courier, monospace !important;
+    text-shadow: 0 0 8px var(--phosphor-glow);
+    letter-spacing: 1px;
+}
+
+.theme-retro input,
+.theme-retro button,
+.theme-retro select {
+    font-family: 'Roboto Mono', 'Courier New', Courier, monospace !important;
+    text-shadow: 0 0 5px var(--phosphor-glow-dim);
+    border-radius: 0 !important;
+}
+
+.theme-retro * { border-radius: 0 !important; }
+
+/* Hide Icons */
+.theme-retro .cell-icon,
+.theme-retro .component-item span:first-child,
+.theme-retro .retro-hide { 
+    display: none !important; 
+}
+
+/* Block Hover States */
+.theme-retro .btn-action,
+.theme-retro .cat-btn,
+.theme-retro .component-item { transition: none !important; }
+
+.theme-retro .cat-btn:hover,
+.theme-retro .component-item:hover,
+.theme-retro .btn-outline:hover,
+.theme-retro .mode-toggle:hover,
+.theme-retro .cancel-btn:hover,
+.theme-retro .unpair-btn:hover {
+    background: var(--text-main) !important;
+    color: var(--bg-base) !important;
+    text-shadow: none !important;
+}
+
+/* Grids & Scanlines */
+.theme-retro .grid-cell { border: 2px solid var(--border-panel); }
+.theme-retro.edit-mode .grid-cell { border: 2px dashed var(--text-muted); }
+
+body.theme-retro::after {
+    content: " ";
+    display: block;
+    position: absolute;
+    top: 0; left: 0; bottom: 0; right: 0;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+    z-index: 2;
+    background-size: 100% 2px;
+    pointer-events: none;
+}
+
+/* Typography Emphasis */
+.theme-retro .cell-title { font-size: 15px !important; letter-spacing: 2px; font-weight: 800; }
+.theme-retro .cell-value { font-size: 15px !important; }
+
+/* Modals & Buttons */
+.theme-retro .mode-toggle,
+.theme-retro .btn-action,
+.theme-retro .cancel-btn,
+.theme-retro .unpair-btn,
+.theme-retro .rotary-btn {
+    background: var(--bg-panel) !important;
+    color: var(--text-main) !important;
+    border: 1px solid var(--text-muted) !important;
+}
+
+.theme-retro .rotary-btn:active { background: var(--text-main) !important; color: var(--bg-base) !important; }
+
+.theme-retro .component-tag {
+    background: var(--bg-base) !important;
+    color: var(--text-main) !important;
+    border: 1px solid var(--text-main) !important;
+}
+
+.theme-retro .profile-item {
+    background: var(--bg-base) !important;
+    border: 1px solid var(--border-panel) !important;
+    color: var(--text-main) !important;
+}
+
+.theme-retro .profile-item.active {
+    border-color: var(--text-main) !important;
+    background: var(--active-bg) !important;
+}
+
+.theme-retro .profile-tag { color: var(--text-muted) !important; }
+
+/* Scrollbars */
+.theme-retro ::-webkit-scrollbar { width: 14px; height: 14px; }
+.theme-retro ::-webkit-scrollbar-track { background: var(--bg-base); border-left: 1px solid var(--border-panel); }
+.theme-retro ::-webkit-scrollbar-thumb { background: var(--border-panel); border: 1px solid var(--bg-base); border-radius: 0; }
+.theme-retro ::-webkit-scrollbar-thumb:hover { background: var(--text-main); }
+.theme-retro * { scrollbar-width: thin; scrollbar-color: var(--border-panel) var(--bg-base); }
+
+.theme-retro .component-item {
+    background: var(--bg-base) !important;
+    border: 1px solid var(--border-panel) !important;
+    color: var(--text-main) !important;
+}
+.theme-retro .component-item:hover {
+    background: var(--text-main) !important;
+    color: var(--bg-base) !important;
+    border-color: var(--text-main) !important;
+}
