@@ -105,7 +105,7 @@ export default function useMSFS(pin, pagesData) {
                 ws.current.close();
             }
         };
-    }, [pin]);
+    }, [pin, broadcastCustomVars]);
 
     // If they drag a new item onto the grid, re-broadcast what to track
     useEffect(() => {

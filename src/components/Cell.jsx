@@ -1,14 +1,14 @@
+import React from 'react';
 import { DICTIONARY } from '../utils/dictionary';
 
 export default function Cell({ index, cellData, isEditMode, onClick, onDelete, onDropCell, onNavigate, simState, sendCommand }) {
     
-    // Setup the Drag and Drop Handlers
     const handleDragStart = (e) => {
         if (isEditMode) e.dataTransfer.setData('sourceIndex', index);
     };
 
     const handleDragOver = (e) => {
-        if (isEditMode) e.preventDefault(); // Required to allow dropping
+        if (isEditMode) e.preventDefault(); 
     };
 
     const handleDrop = (e) => {
@@ -35,7 +35,7 @@ export default function Cell({ index, cellData, isEditMode, onClick, onDelete, o
 
     const dictItem = DICTIONARY[cellData.baseType || cellData.id];
     
-    // 2. Render "Ghost" slots (Prevents the CSS grid from shifting!)
+    // 2. Render "Ghost" slots 
     if (!dictItem) {
         return (
             <div 
@@ -45,17 +45,8 @@ export default function Cell({ index, cellData, isEditMode, onClick, onDelete, o
                 style={{ border: '2px dashed var(--accent-red)', justifyContent: 'center' }}
             >
                 {isEditMode && (
-                    <button 
-                        className="delete-cell-btn"
-                        onClick={(e) => { 
-                            e.stopPropagation(); 
-                            onDelete(index); 
-                        }}
-                    >
-                        ✕
-                    </button>
+                    <button className="delete-cell-btn" onClick={(e) => { e.stopPropagation(); onDelete(index); }}>✕</button>
                 )}
-
                 {isEditMode && (
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                         <span style={{ color: 'var(--accent-red)', fontSize: '16px', marginBottom: '4px' }}>⚠️</span>
@@ -71,29 +62,38 @@ export default function Cell({ index, cellData, isEditMode, onClick, onDelete, o
     const isRotary = dictItem.type === 'rotary';
     const isButtonOrToggle = dictItem.type === 'button' || dictItem.type === 'smart_toggle';
 
-    // TELEMETRY LOGIC
+    // TELEMETRY LOGIC (Bulletproof Lookup)
     let displayValue = "---";
     if (!isEditMode && (isGauge || isRotary)) {
-        const dataKey = cellData.customVar ? ("custom_" + cellData.customVar) : dictItem.dataKey;
-        const rawValue = simState[dataKey];
-        if (rawValue !== undefined && rawValue !== null) {
-            displayValue = dictItem.decimals !== undefined ? Number(rawValue).toFixed(dictItem.decimals) : Math.round(rawValue);
+        // Prioritize custom vars, fallback to dictionary default
+        const dataKey = cellData.customVar || dictItem.dataKey;
+        
+        if (dataKey) {
+            // Check exact match first, then fallback to lowercase match
+            const rawValue = simState[dataKey] !== undefined ? simState[dataKey] : simState[dataKey.toLowerCase()];
+            
+            if (rawValue !== undefined && rawValue !== null) {
+                displayValue = dictItem.decimals !== undefined ? Number(rawValue).toFixed(dictItem.decimals) : Math.round(rawValue);
+            }
         }
     }
 
-    // STATE LOGIC
+    // STATE LOGIC (Bulletproof Lookup)
     let isActive = false;
     if (!isEditMode && isButtonOrToggle) {
-        let stateKey = dictItem.stateKey;
-        if (cellData.customVar) stateKey = "custom_" + cellData.customVar;
-        if (cellData.trackingVar || dictItem.trackingVar) stateKey = "custom_" + (cellData.trackingVar || dictItem.trackingVar);
+        // Prioritize custom vars and tracking vars, fallback to dictionary default
+        const stateKey = cellData.customVar || cellData.trackingVar || dictItem.trackingVar || dictItem.stateKey;
         
-        if (stateKey && simState[stateKey] !== undefined) {
-            isActive = simState[stateKey] >= 1 || simState[stateKey] === true;
+        if (stateKey) {
+            // Check exact match first, then fallback to lowercase match
+            const rawState = simState[stateKey] !== undefined ? simState[stateKey] : simState[stateKey.toLowerCase()];
+            
+            if (rawState !== undefined) {
+                isActive = rawState >= 1 || rawState === true;
+            }
         }
     }
 
-    // CLICK HANDLER
     const handleActionClick = (e) => {
         if (isEditMode) {
             onClick(index);
@@ -102,30 +102,18 @@ export default function Cell({ index, cellData, isEditMode, onClick, onDelete, o
         
         if (e && e.stopPropagation) e.stopPropagation();
 
-        // --- NAVIGATION INTERCEPTORS ---
-        
-        // 1. Going IN (Folders)
         const isFolder = cellData.id?.includes('folder') || cellData.baseType?.includes('folder') || dictItem.type === 'folder';
         if (isFolder && cellData.targetPage !== undefined) {
             onNavigate(cellData.targetPage);
             return;
         }
 
-        // 2. Going OUT (Home / Back Buttons)
         const isHome = cellData.id?.includes('nav_home') || cellData.baseType?.includes('nav_home');
         const isBack = cellData.id?.includes('nav_back') || cellData.baseType?.includes('nav_back');
             
-        if (isHome) {
-            onNavigate(0); 
-            return;
-        }
-
-        if (isBack) {
-            onNavigate(cellData.targetPage !== undefined ? cellData.targetPage : 0);
-            return;
-        }
+        if (isHome) { onNavigate(0); return; }
+        if (isBack) { onNavigate(cellData.targetPage !== undefined ? cellData.targetPage : 0); return; }
         
-        // --- SIMULATOR COMMANDS ---
         if (cellData.baseType === "smart_toggle" || dictItem.type === "smart_toggle") {
             let onC = cellData.onCmd || dictItem.onCmd;
             let offC = cellData.offCmd || dictItem.offCmd;
@@ -151,15 +139,7 @@ export default function Cell({ index, cellData, isEditMode, onClick, onDelete, o
             }}
         >
             {isEditMode && (
-                <button 
-                    className="delete-cell-btn"
-                    onClick={(e) => { 
-                        e.stopPropagation(); 
-                        onDelete(index); 
-                    }}
-                >
-                    ✕
-                </button>
+                <button className="delete-cell-btn" onClick={(e) => { e.stopPropagation(); onDelete(index); }}>✕</button>
             )}
 
             {(!isGauge && !isRotary || isEditMode) && (

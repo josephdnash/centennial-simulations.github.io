@@ -15,7 +15,7 @@ export default function Grid({ pageData, isEditMode, onCellClick, onDeleteCell, 
                     onNavigate={onNavigate}
                     simState={simState}
                     sendCommand={sendCommand}
-                    theme={theme} /* NEW: Pass the theme down */
+                    theme={theme} 
                 />
             ))}
         </div>

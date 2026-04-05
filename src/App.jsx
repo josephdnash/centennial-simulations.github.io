@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { auth, database } from './utils/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { ref, set, get, onValue } from 'firebase/database';
@@ -14,6 +14,7 @@ import ProfileModal from './components/ProfileModal';
 import AdminDashboard from './components/AdminDashboard';
 
 import useMSFS from './hooks/useMSFS';
+import useDebouncedSave from './hooks/useDebouncedSave';
 
 // --- MOBILE DRAG & DROP POLYFILL ---
 import { polyfill } from "mobile-drag-drop";
@@ -181,11 +182,14 @@ function App() {
         return () => unsubscribe();
     }, [user]);
 
-    const saveLayoutToCloud = (newLayoutData) => {
+    // --- DEBOUNCED LAYOUT SAVING ---
+    const saveLayoutToCloud = useCallback((newLayoutData) => {
         if (user && currentProfile) {
             set(ref(database, `users/${user.uid}/layouts/${currentProfile}`), newLayoutData).catch(e => console.error(e));
         }
-    };
+    }, [user, currentProfile]);
+
+    const debouncedSaveLayout = useDebouncedSave(saveLayoutToCloud, 500);
 
     // --- GRID INTERACTION HANDLERS ---
     const handleCellClick = (index) => {
@@ -225,7 +229,7 @@ function App() {
 
         newPagesData[currentPage][index] = ""; 
         setPagesData(newPagesData);
-        saveLayoutToCloud(newPagesData);
+        debouncedSaveLayout(newPagesData);
     };
 
     const handleDropCell = (sourceIndex, targetIndex) => {
@@ -239,7 +243,7 @@ function App() {
 
         newPagesData[currentPage] = currentPageData;
         setPagesData(newPagesData);
-        saveLayoutToCloud(newPagesData);
+        debouncedSaveLayout(newPagesData);
     };
 
     const assignComponent = (componentId, dictData, isCustom = false, customData = null) => {
@@ -298,7 +302,7 @@ function App() {
         
         newPagesData[currentPage] = currentPageData;
         setPagesData(newPagesData);
-        saveLayoutToCloud(newPagesData);
+        debouncedSaveLayout(newPagesData);
         setIsModalOpen(false);
         setSelectedCellIndex(null);
     };
@@ -307,7 +311,7 @@ function App() {
         const newPagesData = [...pagesData];
         newPagesData[currentPage][selectedCellIndex] = updatedCellData;
         setPagesData(newPagesData);
-        saveLayoutToCloud(newPagesData);
+        debouncedSaveLayout(newPagesData);
         setIsCellSettingsOpen(false);
         setSelectedCellIndex(null);
     };
@@ -335,7 +339,7 @@ function App() {
             );
             
             setPagesData(newPagesData);
-            saveLayoutToCloud(newPagesData);
+            debouncedSaveLayout(newPagesData);
         }
     };
 
@@ -504,7 +508,7 @@ function App() {
                 onDeleteCell={handleDeleteCell}
                 onDropCell={handleDropCell}
                 onNavigate={(page) => setCurrentPage(page)}
-                simState={simState}           
+                simState={simState}            
                 sendCommand={sendCommand}
                 theme={theme}
             />
